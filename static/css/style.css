@@ -1,0 +1,139 @@
+/* ===== اتجاه الصفحة وتوزيع المحتوى ===== */
+html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Tajawal', sans-serif;
+    background-color: #f9f9f9;
+    direction: rtl;
+    text-align: right;
+
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh; /* يضمن أن الصفحة تأخذ كامل ارتفاع الشاشة */
+}
+
+/* ===== محتوى الصفحة الرئيسي ===== */
+main {
+    flex: 1; /* يملأ المساحة بين الهيدر والفوتر */
+    padding: 20px;
+    width: 100%;  /* ممتد كامل العرض */
+    box-sizing: border-box; /* لتجنب تجاوز الحشوات */
+}
+
+/* ===== Navbar ===== */
+.navbar {
+    width: 100% !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+}
+
+.navbar .nav-link {
+    margin-left: 10px;
+}
+
+/* ===== الجدول ===== */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    direction: rtl;
+}
+
+th, td {
+    text-align: center;
+    padding: 10px;
+    vertical-align: middle;
+}
+
+th {
+    background-color: #f8f9fa;
+}
+
+td button {
+    min-width: 70px;
+    margin: 0 2px;
+}
+
+/* ===== الأزرار ===== */
+.btn-success { background-color: #28a745; border: none; }
+.btn-warning { background-color: #ffc107; border: none; color: #212529; }
+.btn-danger  { background-color: #dc3545; border: none; }
+
+/* ===== الفوتر ===== */
+footer {
+    background-color: #f8f9fa;
+    color: #6c757d;
+    text-align: center;
+    padding: 15px 0;
+    border-top: 1px solid #dee2e6;
+    width: 100%;
+    margin-top: 50px; /* مسافة بين الجدول والفوتر */
+}
+
+/* ===== نمط النماذج (login/register) ===== */
+form {
+    max-width: 400px;
+    margin: 0 auto;
+    background-color: #fff;
+    padding: 25px;
+    border-radius: 10px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+form .form-label {
+    font-weight: bold;
+}
+
+form button {
+    width: 100%;
+    padding: 10px;
+    margin-top: 10px;
+}
+
+/* ===== responsive لجميع الشاشات ===== */
+@media (max-width: 992px) {
+    table, th, td {
+        font-size: 14px;
+    }
+
+    .navbar .nav-link {
+        margin-left: 5px;
+        font-size: 14px;
+    }
+}
+
+@media (max-width: 768px) {
+    table, th, td {
+        font-size: 13px;
+        padding: 6px;
+    }
+
+    form {
+        padding: 20px;
+        max-width: 90%;
+    }
+}
+
+@media (max-width: 576px) {
+    table, th, td {
+        font-size: 12px;
+    }
+
+    td button {
+        min-width: 60px;
+        padding: 5px 2px;
+        font-size: 12px;
+    }
+
+    form {
+        padding: 15px;
+        max-width: 95%;
+    }
+
+    h1, h2 {
+        font-size: 18px;
+    }
+}

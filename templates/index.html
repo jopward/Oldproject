@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <title>الصفحة الرئيسية</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <h1>مرحباً بك في نظام الحضور والغياب</h1>
+    <nav>
+        <a href="{{ url_for('dashboard') }}">لوحة الحضور</a> |
+        <a href="{{ url_for('reports') }}">التقارير</a>
+    </nav>
+</body>
+</html>

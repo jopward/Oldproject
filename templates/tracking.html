@@ -1,0 +1,102 @@
+{% include 'partials/header.html' %}
+{% include 'partials/navbar.html' %}
+
+<div class="container my-3">
+    <div class="d-flex justify-content-between mb-2">
+        <div>
+            <strong>اليوم والتاريخ: </strong> {{ today }}
+        </div>
+        <div>
+            <strong>الصف والشعبة: </strong> الكل
+        </div>
+    </div>
+
+    <table class="table table-bordered">
+        <thead class="table-light">
+            <tr>
+                <th>الاسم</th>
+                <th>واجب</th>
+                <th>كتاب</th>
+                <th>مشاركة</th>
+                <th>مشاغبة</th>
+                <th>ملاحظة</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for student in students %}
+            {% set rec = records.get(student.id, {}) %}
+            <tr>
+                <td>{{ student.student_name }}</td>
+                <td><input type="checkbox" class="track-checkbox" data-student="{{ student.id }}" data-field="homework" {% if rec.homework %}checked{% endif %}></td>
+                <td><input type="checkbox" class="track-checkbox" data-student="{{ student.id }}" data-field="book" {% if rec.book %}checked{% endif %}></td>
+                <td><input type="checkbox" class="track-checkbox" data-student="{{ student.id }}" data-field="participation" {% if rec.participation %}checked{% endif %}></td>
+                <td><input type="checkbox" class="track-checkbox" data-student="{{ student.id }}" data-field="misbehavior" {% if rec.misbehavior %}checked{% endif %}></td>
+                <td>
+                    <button class="btn btn-sm btn-warning note-btn" data-student="{{ student.id }}" {% if rec.note %}style="background:red"{% endif %}>
+                        {% if rec.note %}تم إدخال ملاحظة{% else %}إضافة ملاحظة{% endif %}
+                    </button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- نافذة الملاحظة المنبثقة -->
+<div id="noteModal" class="modal" style="display:none; position:fixed; top:20%; left:50%; transform:translateX(-50%); background:white; padding:20px; border:1px solid #ccc; z-index:1000;">
+    <h5>إدخال ملاحظة</h5>
+    <textarea id="noteText" rows="5" cols="50"></textarea><br><br>
+    <button id="saveNote" class="btn btn-primary">حفظ</button>
+    <button id="closeNote" class="btn btn-secondary">إغلاق</button>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    // تغيير الشيك بوكس
+    document.querySelectorAll(".track-checkbox").forEach(chk => {
+        chk.addEventListener("change", () => {
+            const studentId = chk.dataset.student;
+            const field = chk.dataset.field;
+            const value = chk.checked ? 1 : 0;
+
+            fetch("/update_tracking", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({student_id: studentId, field: field, value: value})
+            });
+        });
+    });
+
+    // الملاحظة المنبثقة
+    let currentStudentId = null;
+    const modal = document.getElementById("noteModal");
+    const noteText = document.getElementById("noteText");
+
+    document.querySelectorAll(".note-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            currentStudentId = btn.dataset.student;
+            noteText.value = "";
+            modal.style.display = "block";
+        });
+    });
+
+    document.getElementById("saveNote").addEventListener("click", () => {
+        fetch("/update_note", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({student_id: currentStudentId, note: noteText.value})
+        }).then(() => {
+            modal.style.display = "none";
+            const btn = document.querySelector(`.note-btn[data-student='${currentStudentId}']`);
+            btn.style.background = "red";
+            btn.textContent = "تم إدخال ملاحظة";
+        });
+    });
+
+    document.getElementById("closeNote").addEventListener("click", () => {
+        modal.style.display = "none";
+    });
+});
+</script>
+
+{% include 'partials/footer.html' %}

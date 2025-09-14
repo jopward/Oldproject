@@ -1,0 +1,44 @@
+<div class="d-flex justify-content-between mb-3">
+    <div id="today">
+        {{ today }}
+    </div>
+    <div id="class-section">
+        الصف: A الشعبة: 1
+    </div>
+</div>
+
+<table class="table table-bordered text-center">
+    <thead class="table-light sticky-top">
+        <tr>
+            <th>اسم الطالب</th>
+            <th>حاضر</th>
+            <th>متأخر</th>
+            <th>غائب</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for student in students %}
+        <tr>
+            <td>{{ student.student_name }}</td>
+            <td>
+                <input type="checkbox" class="attendance-checkbox" 
+                       data-student-id="{{ student.id }}" 
+                       data-status="present" 
+                       {% if student.status == 'present' %}checked{% endif %}>
+            </td>
+            <td>
+                <input type="checkbox" class="attendance-checkbox" 
+                       data-student-id="{{ student.id }}" 
+                       data-status="late" 
+                       {% if student.status == 'late' %}checked{% endif %}>
+            </td>
+            <td>
+                <input type="checkbox" class="attendance-checkbox" 
+                       data-student-id="{{ student.id }}" 
+                       data-status="absent" 
+                       {% if student.status == 'absent' %}checked{% endif %}>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>

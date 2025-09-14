@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <title>التقارير اليومية</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .note-input {
+            width: 100%;
+            border: none;
+            background-color: transparent;
+            color: black;
+        }
+        .note-input.has-note {
+            color: red;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    {% include 'partials/header.html' %}
+    {% include 'partials/navbar.html' %}
+
+    <h1>تقرير اليوم: {{ today }}</h1>
+
+    <table border="1" cellpadding="5" cellspacing="0">
+        <thead>
+            <tr>
+                <th>اسم الطالب</th>
+                <th>حاضر</th>
+                <th>متأخر</th>
+                <th>غائب</th>
+                <th>واجب</th>
+                <th>كتاب</th>
+                <th>مشاركة</th>
+                <th>مشاغبة</th>
+                <th>ملاحظة</th>
+            </tr>
+        </thead>
+        <tbody id="reportsTableBody">
+            {% for student in students %}
+            <tr>
+                <td>{{ student.student_name }}</td>
+                <td class="clickable" data-student="{{ student.id }}" data-status="present">{{ student.present_count or 0 }}</td>
+                <td class="clickable" data-student="{{ student.id }}" data-status="late">{{ student.late_count or 0 }}</td>
+                <td class="clickable" data-student="{{ student.id }}" data-status="absent">{{ student.absent_count or 0 }}</td>
+                <td class="clickable" data-student="{{ student.id }}" data-field="homework">{{ student.homework or 0 }}</td>
+                <td class="clickable" data-student="{{ student.id }}" data-field="book">{{ student.book or 0 }}</td>
+                <td class="clickable" data-student="{{ student.id }}" data-field="participation">{{ student.participation or 0 }}</td>
+                <td class="clickable" data-student="{{ student.id }}" data-field="misbehavior">{{ student.misbehavior or 0 }}</td>
+                <td>
+                    <input type="text" class="note-input {% if student.note %}has-note{% endif %}" 
+                           value="{{ student.note or '' }}" 
+                           data-student="{{ student.id }}">
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const tableBody = document.getElementById("reportsTableBody");
+
+        tableBody.addEventListener("click", (event) => {
+            const cell = event.target;
+
+            // الحضور والغياب والتأخير والمتابعة
+            if (cell.classList.contains("clickable")) {
+                const studentId = cell.dataset.student;
+                const status = cell.dataset.status;
+                const field = cell.dataset.field;
+
+                if (status) {
+                    fetch(`/get_attendance_details/${studentId}/${status}`)
+                        .then(res => res.json())
+                        .then(dates => {
+                            alert(dates.length ? `${status.toUpperCase()}:\n` + dates.join("\n") : `لا توجد سجلات ${status.toUpperCase()}`);
+                        });
+                } else if (field) {
+                    fetch(`/get_tracking_details/${studentId}/${field}`)
+                        .then(res => res.json())
+                        .then(dates => {
+                            alert(dates.length ? `${field.toUpperCase()}:\n` + dates.join("\n") : `لا توجد سجلات ${field.toUpperCase()}`);
+                        });
+                }
+            }
+        });
+
+        // تحديث الملاحظات مباشرة عند التعديل
+        document.querySelectorAll(".note-input").forEach(input => {
+            input.addEventListener("change", () => {
+                const studentId = input.dataset.student;
+                const note = input.value;
+
+                fetch('/update_note', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ student_id: studentId, note })
+                }).then(() => {
+                    if(note.trim() !== "") {
+                        input.classList.add("has-note");
+                    } else {
+                        input.classList.remove("has-note");
+                    }
+                });
+            });
+        });
+    });
+    </script>
+
+    {% include 'partials/footer.html' %}
+</body>
+</html>
