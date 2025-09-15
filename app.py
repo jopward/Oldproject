@@ -89,26 +89,52 @@ def update_attendance():
     return jsonify({'success': True})
 
 # ----------------------------
-# صفحة الطلاب
+# صفحة الطلاب (محدثة: إضافة دفعة، تعديل، حذف)
 # ----------------------------
 @app.route('/students', methods=['GET', 'POST'])
 @login_required
 def students():
     conn = get_db_connection()
     if request.method == 'POST':
-        student_names_text = request.form['student_names']
+        student_names = request.form['student_names']
         class_name = request.form['class_name']
         section = request.form['section']
-        # تقسيم النص حسب السطر لإنشاء كل طالب
-        student_names = [name.strip() for name in student_names_text.splitlines() if name.strip()]
-        for name in student_names:
-            conn.execute('INSERT INTO students (student_name, class_name, section) VALUES (?, ?, ?)',
-                         (name, class_name, section))
+        for name in student_names.splitlines():
+            name = name.strip()
+            if name:
+                conn.execute('INSERT INTO students (student_name, class_name, section) VALUES (?, ?, ?)',
+                             (name, class_name, section))
         conn.commit()
         return redirect(url_for('students'))
+
     students_list = conn.execute('SELECT * FROM students ORDER BY student_name').fetchall()
     conn.close()
     return render_template('students.html', students=students_list)
+
+# تعديل طالب
+@app.route('/edit_student/<int:student_id>', methods=['POST'])
+@login_required
+def edit_student(student_id):
+    data = request.get_json()
+    student_name = data.get('student_name')
+    class_name = data.get('class_name')
+    section = data.get('section')
+    conn = get_db_connection()
+    conn.execute('UPDATE students SET student_name=?, class_name=?, section=? WHERE id=?',
+                 (student_name, class_name, section, student_id))
+    conn.commit()
+    conn.close()
+    return jsonify({'success': True})
+
+# حذف طالب
+@app.route('/delete_student/<int:student_id>', methods=['POST'])
+@login_required
+def delete_student(student_id):
+    conn = get_db_connection()
+    conn.execute('DELETE FROM students WHERE id=?', (student_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({'success': True})
 
 # ----------------------------
 # صفحة المتابعة اليومية
@@ -167,7 +193,6 @@ def update_note():
 def reports_page():
     conn = get_db_connection()
     today = date.today().isoformat()
-    
     students = conn.execute('''
         SELECT s.id, s.student_name, s.class_name, s.section,
                SUM(CASE WHEN a.status='present' THEN 1 ELSE 0 END) AS present_count,
@@ -179,16 +204,13 @@ def reports_page():
         LEFT JOIN student_tracking t ON s.id = t.student_id AND t.date=?
         GROUP BY s.id
     ''', (today,)).fetchall()
-    
     classes = [row['class_name'] for row in conn.execute("SELECT DISTINCT class_name FROM students").fetchall()]
     sections = [row['section'] for row in conn.execute("SELECT DISTINCT section FROM students").fetchall()]
-    
     conn.close()
-    
     return render_template('reports.html', students=students, today=today, classes=classes, sections=sections)
 
 # ----------------------------
-# واجهات API لجلب التفاصيل لكل طالب
+# API للحصول على تفاصيل الحضور والمتابعة
 # ----------------------------
 @app.route('/get_attendance_details/<int:student_id>/<status>')
 @login_required
