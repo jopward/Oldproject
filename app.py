@@ -13,6 +13,32 @@ def get_db_connection():
     return conn
 
 # ----------------------------
+# صفحة تسجيل الدخول
+# ----------------------------
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+
+        # تحقق بسيط (ممكن يتعدل لاحقاً لقاعدة بيانات مستخدمين)
+        if username == "admin" and password == "1234":
+            return redirect(url_for('dashboard'))  # بعد تسجيل الدخول يذهب للوحة الحضور
+        else:
+            return render_template('login.html', error="اسم المستخدم أو كلمة المرور غير صحيحة")
+
+    return render_template('login.html')
+
+
+# ----------------------------
+# تسجيل الخروج
+# ----------------------------
+@app.route('/logout')
+def logout():
+    return redirect(url_for('login'))
+
+
+# ----------------------------
 # لوحة الحضور والغياب
 # ----------------------------
 @app.route('/')
@@ -30,6 +56,7 @@ def dashboard():
 
     conn.close()
     return render_template('dashboard.html', students=students, today=today)
+
 
 @app.route('/update_attendance', methods=['POST'])
 def update_attendance():
@@ -74,15 +101,13 @@ def tracking():
     conn = get_db_connection()
     today = date.today().isoformat()
 
-    # جلب الطلاب
     students = conn.execute("SELECT id, student_name, class_name, section FROM students").fetchall()
-
-    # جلب سجلات اليوم
     rows = conn.execute("SELECT * FROM student_tracking WHERE date=?", (today,)).fetchall()
     records = {r['student_id']: r for r in rows}
 
     conn.close()
     return render_template("tracking.html", students=students, records=records, today=today)
+
 
 @app.route("/update_tracking", methods=["POST"])
 def update_tracking():
@@ -104,6 +129,7 @@ def update_tracking():
     conn.close()
     return jsonify({"status": "success"})
 
+
 @app.route("/update_note", methods=["POST"])
 def update_note():
     data = request.get_json()
@@ -124,7 +150,7 @@ def update_note():
     return jsonify({"status": "success"})
 
 # ----------------------------
-# صفحة التقارير: حضور + متابعة + ملاحظات
+# صفحة التقارير
 # ----------------------------
 @app.route('/reports')
 def reports():
@@ -146,6 +172,7 @@ def reports():
     conn.close()
     return render_template('reports.html', students=students, today=today)
 
+
 @app.route('/get_attendance_details/<int:student_id>/<status>')
 def get_attendance_details(student_id, status):
     conn = get_db_connection()
@@ -154,14 +181,15 @@ def get_attendance_details(student_id, status):
     conn.close()
     return jsonify(dates)
 
+
 @app.route('/get_tracking_details/<int:student_id>/<field>')
 def get_tracking_details(student_id, field):
     conn = get_db_connection()
-    today = date.today().isoformat()
     rows = conn.execute(f'SELECT date FROM student_tracking WHERE student_id=? AND {field}=1', (student_id,)).fetchall()
     dates = [r['date'] for r in rows]
     conn.close()
     return jsonify(dates)
+
 
 @app.route('/get_note_details/<int:student_id>')
 def get_note_details(student_id):

@@ -1,16 +1,29 @@
-<nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm mb-4">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="/">نظام الحضور</a>
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" 
-                aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-        <div class="collapse navbar-collapse" id="navbarNav">
-            <ul class="navbar-nav me-auto">
-                <li class="nav-item"><a class="nav-link" href="/">الرئيسية</a></li>
-                <li class="nav-item"><a class="nav-link" href="/login">تسجيل الدخول</a></li>
-                <li class="nav-item"><a class="nav-link" href="/register">تسجيل جديد</a></li>
-            </ul>
-        </div>
+<nav class="navbar navbar-expand-lg navbar-light bg-light shadow-sm">
+  <div class="container-fluid">
+    <a class="navbar-brand fw-bold" href="{{ url_for('dashboard') }}">نظام الحضور والغياب</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+      aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav ms-auto">
+        <li class="nav-item">
+          <a class="nav-link" href="{{ url_for('dashboard') }}">الرئيسية</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="{{ url_for('students') }}">الطلاب</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="{{ url_for('reports') }}">التقارير</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="{{ url_for('tracking') }}">المتابعة</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link text-danger" href="{{ url_for('logout') }}">تسجيل الخروج</a>
+        </li>
+      </ul>
     </div>
+  </div>
 </nav>
