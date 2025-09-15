@@ -4,13 +4,13 @@ from datetime import date
 from functools import wraps
 
 app = Flask(__name__)
-app.secret_key = 'your_secret_key_here'  # ضروري للجلسة
+app.secret_key = 'your_secret_key_here'
 
 # ----------------------------
 # دالة مساعدة لفتح اتصال قاعدة البيانات
 # ----------------------------
 def get_db_connection():
-    conn = sqlite3.connect('attendance.db')  # قاعدة البيانات القديمة
+    conn = sqlite3.connect('attendance.db')
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -26,7 +26,7 @@ def login_required(f):
     return decorated_function
 
 # ----------------------------
-# تسجيل الدخول
+# صفحة تسجيل الدخول
 # ----------------------------
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -51,7 +51,7 @@ def logout():
     return redirect(url_for('login'))
 
 # ----------------------------
-# لوحة الحضور والغياب
+# لوحة التحكم
 # ----------------------------
 @app.route('/')
 @login_required
@@ -108,7 +108,7 @@ def students_page():
     return render_template('students.html', students=students_list)
 
 # ----------------------------
-# متابعة الطلاب اليومية مع نافذة الصف والشعبة
+# صفحة المتابعة اليومية
 # ----------------------------
 @app.route("/tracking")
 @login_required
@@ -118,14 +118,8 @@ def tracking_page():
     students = conn.execute("SELECT * FROM students ORDER BY student_name").fetchall()
     rows = conn.execute("SELECT * FROM student_tracking WHERE date=?", (today,)).fetchall()
     records = {r['student_id']: r for r in rows}
-
-    # جلب الصفوف والشُعب للـ Modal
-    classes = [r['class_name'] for r in conn.execute("SELECT DISTINCT class_name FROM students").fetchall()]
-    sections = [r['section'] for r in conn.execute("SELECT DISTINCT section FROM students").fetchall()]
-    
     conn.close()
-    return render_template("tracking.html", students=students, records=records, today=today,
-                           classes=classes, sections=sections)
+    return render_template("tracking.html", students=students, records=records, today=today)
 
 @app.route("/update_tracking", methods=["POST"])
 @login_required
@@ -163,15 +157,17 @@ def update_note():
     return jsonify({"status": "success"})
 
 # ----------------------------
-# صفحة التقارير
+# صفحة التقارير مع موديل اختيار الصف والشعبة وترتيب
 # ----------------------------
 @app.route('/reports')
 @login_required
 def reports_page():
     conn = get_db_connection()
     today = date.today().isoformat()
+    
+    # جلب الطلاب مع كل البيانات
     students = conn.execute('''
-        SELECT s.id, s.student_name,
+        SELECT s.id, s.student_name, s.class_name, s.section,
                SUM(CASE WHEN a.status='present' THEN 1 ELSE 0 END) AS present_count,
                SUM(CASE WHEN a.status='late' THEN 1 ELSE 0 END) AS late_count,
                SUM(CASE WHEN a.status='absent' THEN 1 ELSE 0 END) AS absent_count,
@@ -181,8 +177,35 @@ def reports_page():
         LEFT JOIN student_tracking t ON s.id = t.student_id AND t.date=?
         GROUP BY s.id
     ''', (today,)).fetchall()
+    
+    # جلب كل الصفوف والشعب المتوفرة لخيارات الموديل
+    classes = [row['class_name'] for row in conn.execute("SELECT DISTINCT class_name FROM students").fetchall()]
+    sections = [row['section'] for row in conn.execute("SELECT DISTINCT section FROM students").fetchall()]
+    
     conn.close()
-    return render_template('reports.html', students=students, today=today)
+    
+    return render_template('reports.html', students=students, today=today, classes=classes, sections=sections)
+
+# ----------------------------
+# واجهات API لجلب التفاصيل لكل طالب (للنقر على الحضور/متابعة)
+# ----------------------------
+@app.route('/get_attendance_details/<int:student_id>/<status>')
+@login_required
+def get_attendance_details(student_id, status):
+    conn = get_db_connection()
+    rows = conn.execute("SELECT date FROM attendance WHERE student_id=? AND status=?", (student_id, status)).fetchall()
+    conn.close()
+    dates = [r['date'] for r in rows]
+    return jsonify(dates)
+
+@app.route('/get_tracking_details/<int:student_id>/<field>')
+@login_required
+def get_tracking_details(student_id, field):
+    conn = get_db_connection()
+    rows = conn.execute(f"SELECT date FROM student_tracking WHERE student_id=? AND {field}=1", (student_id,)).fetchall()
+    conn.close()
+    dates = [r['date'] for r in rows]
+    return jsonify(dates)
 
 # ----------------------------
 if __name__ == '__main__':
