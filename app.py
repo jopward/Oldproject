@@ -15,7 +15,7 @@ def get_db_connection():
     return conn
 
 # ----------------------------
-# دالة حماية الصفحات
+# حماية الصفحات
 # ----------------------------
 def login_required(f):
     @wraps(f)
@@ -26,21 +26,19 @@ def login_required(f):
     return decorated_function
 
 # ----------------------------
-# صفحة تسجيل الدخول
+# تسجيل الدخول
 # ----------------------------
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-
         if username == 'admin' and password == '1234':
             session['user'] = username
             return redirect(url_for('dashboard'))
         else:
             flash('اسم المستخدم أو كلمة المرور خاطئة')
             return redirect(url_for('login'))
-
     return render_template('login.html')
 
 # ----------------------------
@@ -53,7 +51,7 @@ def logout():
     return redirect(url_for('login'))
 
 # ----------------------------
-# لوحة التحكم
+# لوحة الحضور والغياب
 # ----------------------------
 @app.route('/')
 @login_required
@@ -61,7 +59,7 @@ def dashboard():
     conn = get_db_connection()
     today = date.today().isoformat()
     students = conn.execute('''
-        SELECT s.id, s.student_name, s.class_name, s.section, a.status
+        SELECT s.id, s.student_name, a.status
         FROM students s
         LEFT JOIN attendance a
         ON s.id = a.student_id AND a.date = ?
@@ -80,7 +78,6 @@ def update_attendance():
     student_id = data['student_id']
     status = data['status']
     today = date.today().isoformat()
-
     conn = get_db_connection()
     existing = conn.execute('SELECT * FROM attendance WHERE student_id=? AND date=?', (student_id, today)).fetchone()
     if existing:
@@ -111,7 +108,7 @@ def students_page():
     return render_template('students.html', students=students_list)
 
 # ----------------------------
-# صفحة المتابعة اليومية
+# متابعة الطلاب اليومية مع نافذة الصف والشعبة
 # ----------------------------
 @app.route("/tracking")
 @login_required
@@ -121,8 +118,14 @@ def tracking_page():
     students = conn.execute("SELECT * FROM students ORDER BY student_name").fetchall()
     rows = conn.execute("SELECT * FROM student_tracking WHERE date=?", (today,)).fetchall()
     records = {r['student_id']: r for r in rows}
+
+    # جلب الصفوف والشُعب للـ Modal
+    classes = [r['class_name'] for r in conn.execute("SELECT DISTINCT class_name FROM students").fetchall()]
+    sections = [r['section'] for r in conn.execute("SELECT DISTINCT section FROM students").fetchall()]
+    
     conn.close()
-    return render_template("tracking.html", students=students, records=records, today=today)
+    return render_template("tracking.html", students=students, records=records, today=today,
+                           classes=classes, sections=sections)
 
 @app.route("/update_tracking", methods=["POST"])
 @login_required
@@ -132,15 +135,12 @@ def update_tracking():
     field = data.get("field")
     value = data.get("value")
     today = date.today().isoformat()
-
     conn = get_db_connection()
     existing = conn.execute("SELECT id FROM student_tracking WHERE student_id=? AND date=?", (student_id, today)).fetchone()
-
     if existing:
         conn.execute(f"UPDATE student_tracking SET {field}=? WHERE student_id=? AND date=?", (value, student_id, today))
     else:
         conn.execute(f"INSERT INTO student_tracking (student_id, date, {field}) VALUES (?, ?, ?)", (student_id, today, value))
-
     conn.commit()
     conn.close()
     return jsonify({"status": "success"})
@@ -152,15 +152,12 @@ def update_note():
     student_id = data.get("student_id")
     note = data.get("note")
     today = date.today().isoformat()
-
     conn = get_db_connection()
     existing = conn.execute("SELECT id FROM student_tracking WHERE student_id=? AND date=?", (student_id, today)).fetchone()
-
     if existing:
         conn.execute("UPDATE student_tracking SET note=? WHERE student_id=? AND date=?", (note, student_id, today))
     else:
         conn.execute("INSERT INTO student_tracking (student_id, date, note) VALUES (?, ?, ?)", (student_id, today, note))
-
     conn.commit()
     conn.close()
     return jsonify({"status": "success"})
