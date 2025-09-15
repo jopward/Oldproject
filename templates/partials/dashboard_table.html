@@ -2,12 +2,21 @@
     <div id="today">
         {{ today }}
     </div>
-    <div id="class-section">
-        الصف: A الشعبة: 1
+
+    <div>
+        <label>الصف:</label>
+        <select id="classSelect" class="form-select d-inline-block w-auto">
+            <option value="">اختر صف</option>
+        </select>
+
+        <label>الشعبة:</label>
+        <select id="sectionSelect" class="form-select d-inline-block w-auto">
+            <option value="">اختر شعبة</option>
+        </select>
     </div>
 </div>
 
-<table class="table table-bordered text-center">
+<table class="table table-bordered text-center" id="attendanceTable">
     <thead class="table-light sticky-top">
         <tr>
             <th>اسم الطالب</th>
@@ -17,8 +26,8 @@
         </tr>
     </thead>
     <tbody>
-        {% for student in students %}
-        <tr>
+        {% for student in students|sort(attribute='student_name') %}
+        <tr data-class="{{ student.class_name }}" data-section="{{ student.section }}">
             <td>{{ student.student_name }}</td>
             <td>
                 <input type="checkbox" class="attendance-checkbox" 
@@ -42,3 +51,48 @@
         {% endfor %}
     </tbody>
 </table>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    const table = document.getElementById("attendanceTable");
+    const classSelect = document.getElementById("classSelect");
+    const sectionSelect = document.getElementById("sectionSelect");
+
+    // جمع كل الصفوف والشعب المتاحة
+    const classes = new Set();
+    const sections = new Set();
+    table.querySelectorAll("tbody tr").forEach(row => {
+        classes.add(row.dataset.class);
+        sections.add(row.dataset.section);
+    });
+
+    // ملء قوائم الاختيار
+    classes.forEach(c => {
+        const opt = document.createElement("option");
+        opt.value = c;
+        opt.textContent = c;
+        classSelect.appendChild(opt);
+    });
+    sections.forEach(s => {
+        const opt = document.createElement("option");
+        opt.value = s;
+        opt.textContent = s;
+        sectionSelect.appendChild(opt);
+    });
+
+    function filterTable() {
+        const selectedClass = classSelect.value;
+        const selectedSection = sectionSelect.value;
+
+        table.querySelectorAll("tbody tr").forEach(row => {
+            let show = true;
+            if(selectedClass && row.dataset.class !== selectedClass) show = false;
+            if(selectedSection && row.dataset.section !== selectedSection) show = false;
+            row.style.display = show ? "" : "none";
+        });
+    }
+
+    classSelect.addEventListener("change", filterTable);
+    sectionSelect.addEventListener("change", filterTable);
+});
+</script>

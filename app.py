@@ -10,7 +10,7 @@ app.secret_key = 'your_secret_key_here'  # ضروري للجلسة
 # دالة مساعدة لفتح اتصال قاعدة البيانات
 # ----------------------------
 def get_db_connection():
-    conn = sqlite3.connect('attendance.db')
+    conn = sqlite3.connect('attendance.db')  # قاعدة البيانات القديمة
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -34,7 +34,6 @@ def login():
         username = request.form['username']
         password = request.form['password']
 
-        # تحقق من المستخدم (يمكن تعديل للتحقق من قاعدة بيانات حقيقية)
         if username == 'admin' and password == '1234':
             session['user'] = username
             return redirect(url_for('dashboard'))
@@ -54,7 +53,7 @@ def logout():
     return redirect(url_for('login'))
 
 # ----------------------------
-# لوحة الحضور والغياب
+# لوحة التحكم
 # ----------------------------
 @app.route('/')
 @login_required
@@ -62,14 +61,18 @@ def dashboard():
     conn = get_db_connection()
     today = date.today().isoformat()
     students = conn.execute('''
-        SELECT s.id, s.student_name, a.status
+        SELECT s.id, s.student_name, s.class_name, s.section, a.status
         FROM students s
         LEFT JOIN attendance a
         ON s.id = a.student_id AND a.date = ?
+        ORDER BY s.student_name
     ''', (today,)).fetchall()
     conn.close()
     return render_template('dashboard.html', students=students, today=today)
 
+# ----------------------------
+# تحديث الحضور
+# ----------------------------
 @app.route('/update_attendance', methods=['POST'])
 @login_required
 def update_attendance():
@@ -103,19 +106,19 @@ def students_page():
                      (student_name, class_name, section))
         conn.commit()
         return redirect(url_for('students_page'))
-    students_list = conn.execute('SELECT * FROM students').fetchall()
+    students_list = conn.execute('SELECT * FROM students ORDER BY student_name').fetchall()
     conn.close()
     return render_template('students.html', students=students_list)
 
 # ----------------------------
-# صفحة المتابعة اليومية للطلاب
+# صفحة المتابعة اليومية
 # ----------------------------
 @app.route("/tracking")
 @login_required
 def tracking_page():
     conn = get_db_connection()
     today = date.today().isoformat()
-    students = conn.execute("SELECT * FROM students").fetchall()
+    students = conn.execute("SELECT * FROM students ORDER BY student_name").fetchall()
     rows = conn.execute("SELECT * FROM student_tracking WHERE date=?", (today,)).fetchall()
     records = {r['student_id']: r for r in rows}
     conn.close()
@@ -183,34 +186,6 @@ def reports_page():
     ''', (today,)).fetchall()
     conn.close()
     return render_template('reports.html', students=students, today=today)
-
-@app.route('/get_attendance_details/<int:student_id>/<status>')
-@login_required
-def get_attendance_details(student_id, status):
-    conn = get_db_connection()
-    rows = conn.execute('SELECT date FROM attendance WHERE student_id=? AND status=?', (student_id, status)).fetchall()
-    dates = [r['date'] for r in rows]
-    conn.close()
-    return jsonify(dates)
-
-@app.route('/get_tracking_details/<int:student_id>/<field>')
-@login_required
-def get_tracking_details(student_id, field):
-    conn = get_db_connection()
-    rows = conn.execute(f'SELECT date FROM student_tracking WHERE student_id=? AND {field}=1', (student_id,)).fetchall()
-    dates = [r['date'] for r in rows]
-    conn.close()
-    return jsonify(dates)
-
-@app.route('/get_note_details/<int:student_id>')
-@login_required
-def get_note_details(student_id):
-    conn = get_db_connection()
-    today = date.today().isoformat()
-    row = conn.execute('SELECT note FROM student_tracking WHERE student_id=? AND date=?', (student_id, today)).fetchone()
-    note = row['note'] if row else ""
-    conn.close()
-    return jsonify({"note": note})
 
 # ----------------------------
 if __name__ == '__main__':
