@@ -5,14 +5,15 @@
 
     <h1 class="mb-4">قائمة الطلاب</h1>
 
-    <!-- نموذج إضافة طالب جديد -->
+    <!-- نموذج إضافة طلاب جدد -->
     <div class="card mb-4 p-3">
-        <h4>إضافة طالب جديد</h4>
+        <h4>إضافة طلاب جدد</h4>
         <form method="POST" id="addStudentForm">
             <input type="hidden" name="action" value="add">
+
             <div class="mb-2">
-                <label>الاسم:</label>
-                <input type="text" name="student_name" required class="form-control">
+                <label>الأسماء (ضع كل اسم في سطر جديد):</label>
+                <textarea name="student_names" rows="5" class="form-control" placeholder="مثال:&#10;محمد علي محمد&#10;أحمد محمود عثمان" required></textarea>
             </div>
 
             <div class="mb-2">
@@ -90,7 +91,6 @@ document.addEventListener("DOMContentLoaded", () => {
             const classCell = row.querySelector(".class");
             const sectionCell = row.querySelector(".section");
 
-            // تحويل الخلايا إلى حقول نصية
             const name = nameCell.textContent;
             const className = classCell.textContent;
             const section = sectionCell.textContent;
@@ -106,11 +106,10 @@ document.addEventListener("DOMContentLoaded", () => {
                 </select>
             `;
 
-            btn.style.display = "none"; // إخفاء زر تعديل
+            btn.style.display = "none";
             const saveBtn = row.querySelector(".saveBtn");
             saveBtn.style.display = "inline-block";
 
-            // حفظ التعديلات
             saveBtn.addEventListener("click", () => {
                 const newName = nameCell.querySelector("input").value;
                 const newClass = classCell.querySelector("input").value;
