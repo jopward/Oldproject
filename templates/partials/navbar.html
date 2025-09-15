@@ -1,29 +1,34 @@
-<nav class="navbar navbar-expand-lg navbar-light bg-light shadow-sm">
+<nav class="navbar navbar-expand-lg navbar-light bg-light mb-3">
   <div class="container-fluid">
-    <a class="navbar-brand fw-bold" href="{{ url_for('dashboard') }}">نظام الحضور والغياب</a>
+    <a class="navbar-brand" href="{{ url_for('dashboard') }}">نظام الحضور</a>
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
       aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
       <span class="navbar-toggler-icon"></span>
     </button>
 
     <div class="collapse navbar-collapse" id="navbarNav">
-      <ul class="navbar-nav ms-auto">
+      <ul class="navbar-nav me-auto mb-2 mb-lg-0">
         <li class="nav-item">
-          <a class="nav-link" href="{{ url_for('dashboard') }}">الرئيسية</a>
+          <a class="nav-link" href="{{ url_for('dashboard') }}">الحضور والغياب</a>
         </li>
         <li class="nav-item">
-          <a class="nav-link" href="{{ url_for('students') }}">الطلاب</a>
+          <a class="nav-link" href="{{ url_for('students_page') }}">الطلاب</a>
         </li>
         <li class="nav-item">
-          <a class="nav-link" href="{{ url_for('reports') }}">التقارير</a>
+          <a class="nav-link" href="{{ url_for('tracking_page') }}">المتابعة اليومية</a>
         </li>
         <li class="nav-item">
-          <a class="nav-link" href="{{ url_for('tracking') }}">المتابعة</a>
+          <a class="nav-link" href="{{ url_for('reports_page') }}">التقارير</a>
         </li>
+      </ul>
+
+      {% if session.get('user') %}
+      <ul class="navbar-nav">
         <li class="nav-item">
           <a class="nav-link text-danger" href="{{ url_for('logout') }}">تسجيل الخروج</a>
         </li>
       </ul>
+      {% endif %}
     </div>
   </div>
 </nav>
