@@ -1,84 +1,73 @@
-<div class="d-flex justify-content-between mb-3">
-    <div id="today">
-        {{ today }}
+{% include 'partials/header.html' %}
+{% include 'partials/navbar.html' %}
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between mb-3 align-items-center">
+        <div id="today">
+            {{ today }}
+        </div>
+
+        <div>
+            <label>الصف:</label>
+            <select id="classSelect" class="form-select d-inline-block w-auto">
+                <option value="">اختر صف</option>
+                {% for c in classes %}
+                <option value="{{ c }}">{{ c }}</option>
+                {% endfor %}
+            </select>
+
+            <label>الشعبة:</label>
+            <select id="sectionSelect" class="form-select d-inline-block w-auto">
+                <option value="">اختر شعبة</option>
+                {% for s in sections %}
+                <option value="{{ s }}">{{ s }}</option>
+                {% endfor %}
+            </select>
+        </div>
     </div>
 
-    <div>
-        <label>الصف:</label>
-        <select id="classSelect" class="form-select d-inline-block w-auto">
-            <option value="">اختر صف</option>
-        </select>
-
-        <label>الشعبة:</label>
-        <select id="sectionSelect" class="form-select d-inline-block w-auto">
-            <option value="">اختر شعبة</option>
-        </select>
-    </div>
+    <table class="table table-bordered text-center" id="attendanceTable">
+        <thead class="table-light sticky-top">
+            <tr>
+                <th>اسم الطالب</th>
+                <th>حاضر</th>
+                <th>متأخر</th>
+                <th>غائب</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for student in students|sort(attribute='student_name') %}
+            <tr data-class="{{ student.class_name }}" data-section="{{ student.section }}">
+                <td>{{ student.student_name }}</td>
+                <td>
+                    <input type="checkbox" class="attendance-checkbox" 
+                           data-student-id="{{ student.id }}" 
+                           data-status="present" 
+                           {% if student.status == 'present' %}checked{% endif %}>
+                </td>
+                <td>
+                    <input type="checkbox" class="attendance-checkbox" 
+                           data-student-id="{{ student.id }}" 
+                           data-status="late" 
+                           {% if student.status == 'late' %}checked{% endif %}>
+                </td>
+                <td>
+                    <input type="checkbox" class="attendance-checkbox" 
+                           data-student-id="{{ student.id }}" 
+                           data-status="absent" 
+                           {% if student.status == 'absent' %}checked{% endif %}>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
 </div>
-
-<table class="table table-bordered text-center" id="attendanceTable">
-    <thead class="table-light sticky-top">
-        <tr>
-            <th>اسم الطالب</th>
-            <th>حاضر</th>
-            <th>متأخر</th>
-            <th>غائب</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for student in students|sort(attribute='student_name') %}
-        <tr data-class="{{ student.class_name }}" data-section="{{ student.section }}">
-            <td>{{ student.student_name }}</td>
-            <td>
-                <input type="checkbox" class="attendance-checkbox" 
-                       data-student-id="{{ student.id }}" 
-                       data-status="present" 
-                       {% if student.status == 'present' %}checked{% endif %}>
-            </td>
-            <td>
-                <input type="checkbox" class="attendance-checkbox" 
-                       data-student-id="{{ student.id }}" 
-                       data-status="late" 
-                       {% if student.status == 'late' %}checked{% endif %}>
-            </td>
-            <td>
-                <input type="checkbox" class="attendance-checkbox" 
-                       data-student-id="{{ student.id }}" 
-                       data-status="absent" 
-                       {% if student.status == 'absent' %}checked{% endif %}>
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
 
 <script>
 document.addEventListener("DOMContentLoaded", () => {
     const table = document.getElementById("attendanceTable");
     const classSelect = document.getElementById("classSelect");
     const sectionSelect = document.getElementById("sectionSelect");
-
-    // جمع كل الصفوف والشعب المتاحة
-    const classes = new Set();
-    const sections = new Set();
-    table.querySelectorAll("tbody tr").forEach(row => {
-        classes.add(row.dataset.class);
-        sections.add(row.dataset.section);
-    });
-
-    // ملء قوائم الاختيار
-    classes.forEach(c => {
-        const opt = document.createElement("option");
-        opt.value = c;
-        opt.textContent = c;
-        classSelect.appendChild(opt);
-    });
-    sections.forEach(s => {
-        const opt = document.createElement("option");
-        opt.value = s;
-        opt.textContent = s;
-        sectionSelect.appendChild(opt);
-    });
 
     function filterTable() {
         const selectedClass = classSelect.value;
@@ -94,5 +83,24 @@ document.addEventListener("DOMContentLoaded", () => {
 
     classSelect.addEventListener("change", filterTable);
     sectionSelect.addEventListener("change", filterTable);
+
+    // تحديث الحضور عند التغيير
+    document.querySelectorAll(".attendance-checkbox").forEach(cb => {
+        cb.addEventListener("change", () => {
+            const studentId = cb.dataset.studentId;
+            const status = cb.dataset.status;
+
+            fetch("/update_attendance", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ student_id: studentId, status: status })
+            }).then(res => res.json())
+              .then(data => {
+                  if(!data.success) alert("حدث خطأ أثناء تحديث الحضور");
+              });
+        });
+    });
 });
 </script>
+
+{% include 'partials/footer.html' %}

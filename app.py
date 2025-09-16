@@ -1,235 +1,40 @@
-from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash
-import sqlite3
-from datetime import date
-from functools import wraps
+# app.py
+from flask import Flask
+from auth import login_view, logout_view, login_required
+import attendance
+import students as students_module
+import tracking
+import reports as reports_module
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key_here'
 
-# ----------------------------
-# دالة مساعدة لفتح اتصال قاعدة البيانات
-# ----------------------------
-def get_db_connection():
-    conn = sqlite3.connect('attendance.db')
-    conn.row_factory = sqlite3.Row
-    return conn
+# --- تسجيل المسارات كما في الكود الأصلي (نحافظ على أسماء endpoints) ---
 
-# ----------------------------
-# حماية الصفحات
-# ----------------------------
-def login_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if 'user' not in session:
-            return redirect(url_for('login'))
-        return f(*args, **kwargs)
-    return decorated_function
+# auth
+app.add_url_rule('/login', 'login', login_view, methods=['GET', 'POST'])
+app.add_url_rule('/logout', 'logout', logout_view)
 
-# ----------------------------
-# صفحة تسجيل الدخول
-# ----------------------------
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-        if username == 'admin' and password == '1234':
-            session['user'] = username
-            return redirect(url_for('dashboard'))
-        else:
-            flash('اسم المستخدم أو كلمة المرور خاطئة')
-            return redirect(url_for('login'))
-    return render_template('login.html')
+# attendance / dashboard
+# عرض لوحة الحضور (function name: dashboard)
+app.add_url_rule('/', 'dashboard', attendance.dashboard)
+# تحديث حضور (POST)
+app.add_url_rule('/update_attendance', 'update_attendance', attendance.update_attendance, methods=['POST'])
 
-# ----------------------------
-# تسجيل الخروج
-# ----------------------------
-@app.route('/logout')
-@login_required
-def logout():
-    session.pop('user', None)
-    return redirect(url_for('login'))
+# students
+app.add_url_rule('/students', 'students', students_module.students, methods=['GET', 'POST'])
+app.add_url_rule('/edit_student/<int:student_id>', 'edit_student', students_module.edit_student, methods=['POST'])
+app.add_url_rule('/delete_student/<int:student_id>', 'delete_student', students_module.delete_student, methods=['POST'])
 
-# ----------------------------
-# لوحة التحكم
-# ----------------------------
-@app.route('/')
-@login_required
-def dashboard():
-    conn = get_db_connection()
-    today = date.today().isoformat()
-    students = conn.execute('''
-        SELECT s.id, s.student_name, a.status
-        FROM students s
-        LEFT JOIN attendance a
-        ON s.id = a.student_id AND a.date = ?
-        ORDER BY s.student_name
-    ''', (today,)).fetchall()
-    conn.close()
-    return render_template('dashboard.html', students=students, today=today)
+# tracking
+app.add_url_rule('/tracking', 'tracking_page', tracking.tracking_page)
+app.add_url_rule('/update_tracking', 'update_tracking', tracking.update_tracking, methods=['POST'])
+app.add_url_rule('/update_note', 'update_note', tracking.update_note, methods=['POST'])
 
-# ----------------------------
-# تحديث الحضور
-# ----------------------------
-@app.route('/update_attendance', methods=['POST'])
-@login_required
-def update_attendance():
-    data = request.get_json()
-    student_id = data['student_id']
-    status = data['status']
-    today = date.today().isoformat()
-    conn = get_db_connection()
-    existing = conn.execute('SELECT * FROM attendance WHERE student_id=? AND date=?', (student_id, today)).fetchone()
-    if existing:
-        conn.execute('UPDATE attendance SET status=? WHERE student_id=? AND date=?', (status, student_id, today))
-    else:
-        conn.execute('INSERT INTO attendance (student_id, date, status) VALUES (?, ?, ?)', (student_id, today, status))
-    conn.commit()
-    conn.close()
-    return jsonify({'success': True})
+# reports
+app.add_url_rule('/reports', 'reports_page', reports_module.reports_page)
+app.add_url_rule('/get_attendance_details/<int:student_id>/<status>', 'get_attendance_details', reports_module.get_attendance_details)
+app.add_url_rule('/get_tracking_details/<int:student_id>/<field>', 'get_tracking_details', reports_module.get_tracking_details)
 
-# ----------------------------
-# صفحة الطلاب (محدثة: إضافة دفعة، تعديل، حذف)
-# ----------------------------
-@app.route('/students', methods=['GET', 'POST'])
-@login_required
-def students():
-    conn = get_db_connection()
-    if request.method == 'POST':
-        student_names = request.form['student_names']
-        class_name = request.form['class_name']
-        section = request.form['section']
-        for name in student_names.splitlines():
-            name = name.strip()
-            if name:
-                conn.execute('INSERT INTO students (student_name, class_name, section) VALUES (?, ?, ?)',
-                             (name, class_name, section))
-        conn.commit()
-        return redirect(url_for('students'))
-
-    students_list = conn.execute('SELECT * FROM students ORDER BY student_name').fetchall()
-    conn.close()
-    return render_template('students.html', students=students_list)
-
-# تعديل طالب
-@app.route('/edit_student/<int:student_id>', methods=['POST'])
-@login_required
-def edit_student(student_id):
-    data = request.get_json()
-    student_name = data.get('student_name')
-    class_name = data.get('class_name')
-    section = data.get('section')
-    conn = get_db_connection()
-    conn.execute('UPDATE students SET student_name=?, class_name=?, section=? WHERE id=?',
-                 (student_name, class_name, section, student_id))
-    conn.commit()
-    conn.close()
-    return jsonify({'success': True})
-
-# حذف طالب
-@app.route('/delete_student/<int:student_id>', methods=['POST'])
-@login_required
-def delete_student(student_id):
-    conn = get_db_connection()
-    conn.execute('DELETE FROM students WHERE id=?', (student_id,))
-    conn.commit()
-    conn.close()
-    return jsonify({'success': True})
-
-# ----------------------------
-# صفحة المتابعة اليومية
-# ----------------------------
-@app.route("/tracking")
-@login_required
-def tracking_page():
-    conn = get_db_connection()
-    today = date.today().isoformat()
-    students = conn.execute("SELECT * FROM students ORDER BY student_name").fetchall()
-    rows = conn.execute("SELECT * FROM student_tracking WHERE date=?", (today,)).fetchall()
-    records = {r['student_id']: r for r in rows}
-    conn.close()
-    return render_template("tracking.html", students=students, records=records, today=today)
-
-@app.route("/update_tracking", methods=["POST"])
-@login_required
-def update_tracking():
-    data = request.get_json()
-    student_id = data.get("student_id")
-    field = data.get("field")
-    value = data.get("value")
-    today = date.today().isoformat()
-    conn = get_db_connection()
-    existing = conn.execute("SELECT id FROM student_tracking WHERE student_id=? AND date=?", (student_id, today)).fetchone()
-    if existing:
-        conn.execute(f"UPDATE student_tracking SET {field}=? WHERE student_id=? AND date=?", (value, student_id, today))
-    else:
-        conn.execute(f"INSERT INTO student_tracking (student_id, date, {field}) VALUES (?, ?, ?)", (student_id, today, value))
-    conn.commit()
-    conn.close()
-    return jsonify({"status": "success"})
-
-@app.route("/update_note", methods=["POST"])
-@login_required
-def update_note():
-    data = request.get_json()
-    student_id = data.get("student_id")
-    note = data.get("note")
-    today = date.today().isoformat()
-    conn = get_db_connection()
-    existing = conn.execute("SELECT id FROM student_tracking WHERE student_id=? AND date=?", (student_id, today)).fetchone()
-    if existing:
-        conn.execute("UPDATE student_tracking SET note=? WHERE student_id=? AND date=?", (note, student_id, today))
-    else:
-        conn.execute("INSERT INTO student_tracking (student_id, date, note) VALUES (?, ?, ?)", (student_id, today, note))
-    conn.commit()
-    conn.close()
-    return jsonify({"status": "success"})
-
-# ----------------------------
-# صفحة التقارير
-# ----------------------------
-@app.route('/reports')
-@login_required
-def reports_page():
-    conn = get_db_connection()
-    today = date.today().isoformat()
-    students = conn.execute('''
-        SELECT s.id, s.student_name, s.class_name, s.section,
-               SUM(CASE WHEN a.status='present' THEN 1 ELSE 0 END) AS present_count,
-               SUM(CASE WHEN a.status='late' THEN 1 ELSE 0 END) AS late_count,
-               SUM(CASE WHEN a.status='absent' THEN 1 ELSE 0 END) AS absent_count,
-               t.homework, t.book, t.participation, t.misbehavior, t.note
-        FROM students s
-        LEFT JOIN attendance a ON s.id = a.student_id
-        LEFT JOIN student_tracking t ON s.id = t.student_id AND t.date=?
-        GROUP BY s.id
-    ''', (today,)).fetchall()
-    classes = [row['class_name'] for row in conn.execute("SELECT DISTINCT class_name FROM students").fetchall()]
-    sections = [row['section'] for row in conn.execute("SELECT DISTINCT section FROM students").fetchall()]
-    conn.close()
-    return render_template('reports.html', students=students, today=today, classes=classes, sections=sections)
-
-# ----------------------------
-# API للحصول على تفاصيل الحضور والمتابعة
-# ----------------------------
-@app.route('/get_attendance_details/<int:student_id>/<status>')
-@login_required
-def get_attendance_details(student_id, status):
-    conn = get_db_connection()
-    rows = conn.execute("SELECT date FROM attendance WHERE student_id=? AND status=?", (student_id, status)).fetchall()
-    conn.close()
-    dates = [r['date'] for r in rows]
-    return jsonify(dates)
-
-@app.route('/get_tracking_details/<int:student_id>/<field>')
-@login_required
-def get_tracking_details(student_id, field):
-    conn = get_db_connection()
-    rows = conn.execute(f"SELECT date FROM student_tracking WHERE student_id=? AND {field}=1", (student_id,)).fetchall()
-    conn.close()
-    dates = [r['date'] for r in rows]
-    return jsonify(dates)
-
-# ----------------------------
 if __name__ == '__main__':
     app.run(debug=True)
