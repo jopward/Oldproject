@@ -7,11 +7,28 @@ from auth import login_required
 def tracking_page():
     conn = get_db_connection()
     today = date.today().isoformat()
+
+    # جميع الطلاب
     students = conn.execute("SELECT * FROM students ORDER BY student_name").fetchall()
+
+    # بيانات التتبع لليوم الحالي
     rows = conn.execute("SELECT * FROM student_tracking WHERE date=?", (today,)).fetchall()
     records = {r['student_id']: r for r in rows}
+
+    # ✅ الصفوف والشعب المميزة
+    classes = [row['class_name'] for row in conn.execute("SELECT DISTINCT class_name FROM students").fetchall()]
+    sections = [row['section'] for row in conn.execute("SELECT DISTINCT section FROM students").fetchall()]
+
     conn.close()
-    return render_template("tracking.html", students=students, records=records, today=today)
+
+    return render_template(
+        "tracking.html",
+        students=students,
+        records=records,
+        today=today,
+        classes=classes,
+        sections=sections
+    )
 
 def update_tracking():
     data = request.get_json()
@@ -19,12 +36,24 @@ def update_tracking():
     field = data.get("field")
     value = data.get("value")
     today = date.today().isoformat()
+
     conn = get_db_connection()
-    existing = conn.execute("SELECT id FROM student_tracking WHERE student_id=? AND date=?", (student_id, today)).fetchone()
+    existing = conn.execute(
+        "SELECT id FROM student_tracking WHERE student_id=? AND date=?",
+        (student_id, today)
+    ).fetchone()
+
     if existing:
-        conn.execute(f"UPDATE student_tracking SET {field}=? WHERE student_id=? AND date=?", (value, student_id, today))
+        conn.execute(
+            f"UPDATE student_tracking SET {field}=? WHERE student_id=? AND date=?",
+            (value, student_id, today)
+        )
     else:
-        conn.execute(f"INSERT INTO student_tracking (student_id, date, {field}) VALUES (?, ?, ?)", (student_id, today, value))
+        conn.execute(
+            f"INSERT INTO student_tracking (student_id, date, {field}) VALUES (?, ?, ?)",
+            (student_id, today, value)
+        )
+
     conn.commit()
     conn.close()
     return jsonify({"status": "success"})
@@ -34,12 +63,24 @@ def update_note():
     student_id = data.get("student_id")
     note = data.get("note")
     today = date.today().isoformat()
+
     conn = get_db_connection()
-    existing = conn.execute("SELECT id FROM student_tracking WHERE student_id=? AND date=?", (student_id, today)).fetchone()
+    existing = conn.execute(
+        "SELECT id FROM student_tracking WHERE student_id=? AND date=?",
+        (student_id, today)
+    ).fetchone()
+
     if existing:
-        conn.execute("UPDATE student_tracking SET note=? WHERE student_id=? AND date=?", (note, student_id, today))
+        conn.execute(
+            "UPDATE student_tracking SET note=? WHERE student_id=? AND date=?",
+            (note, student_id, today)
+        )
     else:
-        conn.execute("INSERT INTO student_tracking (student_id, date, note) VALUES (?, ?, ?)", (student_id, today, note))
+        conn.execute(
+            "INSERT INTO student_tracking (student_id, date, note) VALUES (?, ?, ?)",
+            (student_id, today, note)
+        )
+
     conn.commit()
     conn.close()
     return jsonify({"status": "success"})
