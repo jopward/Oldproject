@@ -3,24 +3,25 @@
 
 <div class="container mt-4">
   <div class="d-flex justify-content-between align-items-center mb-3">
-    <h3>➕ إضافة صف وشعبة جديدة</h3>
-    <a href="{{ url_for('list_classes') }}" class="btn btn-secondary">🔙 رجوع للصفوف</a>
+    <h3 class="mb-0">➕ إضافة صف وشعبة جديدة</h3>
+    <a href="{{ url_for('list_classes') }}" class="btn btn-outline-secondary">🔙 رجوع للصفوف</a>
   </div>
 
   <!-- رسائل التنبيه -->
   {% with messages = get_flashed_messages() %}
     {% if messages %}
-      <div class="alert alert-info">
+      <div class="alert alert-info alert-dismissible fade show" role="alert">
         {% for msg in messages %}
           <div>{{ msg }}</div>
         {% endfor %}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
       </div>
     {% endif %}
   {% endwith %}
 
-  <form method="POST" class="card p-4 shadow-sm rounded">
+  <form method="POST" class="card p-4 shadow-sm rounded bg-light">
     <div class="mb-3">
-      <label class="form-label">اختر المعلم</label>
+      <label class="form-label fw-bold">👨‍🏫 اختر المعلم</label>
       <select name="teacher_id" class="form-select" required>
         <option value="">-- اختر --</option>
         {% for teacher in teachers %}
@@ -30,16 +31,18 @@
     </div>
 
     <div class="mb-3">
-      <label class="form-label">اسم الصف</label>
+      <label class="form-label fw-bold">🏫 اسم الصف</label>
       <input type="text" name="class_name" class="form-control" placeholder="مثال: الصف السابع" required>
     </div>
 
     <div class="mb-3">
-      <label class="form-label">الشعبة</label>
+      <label class="form-label fw-bold">🔤 الشعبة</label>
       <input type="text" name="section" class="form-control" placeholder="مثال: أ" required>
     </div>
 
-    <button type="submit" class="btn btn-primary">💾 حفظ</button>
+    <div class="text-end">
+      <button type="submit" class="btn btn-primary">💾 حفظ</button>
+    </div>
   </form>
 </div>
 
