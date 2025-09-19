@@ -20,24 +20,44 @@
   {% endwith %}
 
   <form method="POST" class="card p-4 shadow-sm rounded bg-light">
-    <div class="mb-3">
-      <label class="form-label fw-bold">👨‍🏫 اختر المعلم</label>
-      <select name="teacher_id" class="form-select" required>
-        <option value="">-- اختر --</option>
-        {% for teacher in teachers %}
-        <option value="{{ teacher.id }}">{{ teacher.teacher_name }}</option>
-        {% endfor %}
-      </select>
-    </div>
 
+    <!-- اسم الصف -->
     <div class="mb-3">
       <label class="form-label fw-bold">🏫 اسم الصف</label>
       <input type="text" name="class_name" class="form-control" placeholder="مثال: الصف السابع" required>
     </div>
 
+    <!-- الشعبة -->
     <div class="mb-3">
       <label class="form-label fw-bold">🔤 الشعبة</label>
-      <input type="text" name="section" class="form-control" placeholder="مثال: أ" required>
+      <select name="section" class="form-select" required>
+        <option value="">-- اختر الشعبة --</option>
+        {% set sections = ['أ', 'ب', 'ج', 'د', 'و', 'هـ', 'ي'] %}
+        {% for s in sections %}
+          <option value="{{ s }}">{{ s }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <!-- الفترة -->
+    <div class="mb-3">
+      <label class="form-label fw-bold">⏰ الفترة</label>
+      <select name="period" class="form-select">
+        <option value="صباحي" selected>صباحي</option>
+        <option value="مسائي">مسائي</option>
+      </select>
+      <div class="form-text">إذا لم تختَر، يتم حفظ الصف تلقائيًا كـ <b>صباحي</b>.</div>
+    </div>
+
+    <!-- المعلمين -->
+    <div class="mb-3">
+      <label class="form-label fw-bold">👨‍🏫 اختر المعلمين</label>
+      <select name="teacher_ids" class="form-select" multiple required>
+        {% for teacher in teachers %}
+        <option value="{{ teacher.id }}">{{ teacher.teacher_name }}</option>
+        {% endfor %}
+      </select>
+      <div class="form-text">يمكنك اختيار أكثر من معلم بالضغط على Ctrl أو Cmd مع النقر.</div>
     </div>
 
     <div class="text-end">

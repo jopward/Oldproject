@@ -7,10 +7,11 @@ import reports as reports_module
 import db  # ✅ استدعاء db.py
 import teachers  # ملف teachers.py الجديد
 
+# --- ✅ تعريف التطبيق ---
 app = Flask(__name__)
 app.secret_key = 'your_secret_key_here'
 
-# --- تسجيل المسارات ---
+# --- ✅ تسجيل المسارات ---
 
 # auth
 app.add_url_rule('/login', 'login', login_view, methods=['GET', 'POST'])
@@ -40,6 +41,7 @@ app.add_url_rule('/teachers', 'teachers_page', teachers.teachers_page, methods=[
 app.add_url_rule('/teachers/delete/<int:teacher_id>', 'delete_teacher', teachers.delete_teacher, methods=['POST'])
 app.add_url_rule('/teachers/add', 'add_teacher', teachers.add_teacher, methods=['POST'])
 
+
 # --- ✅ إضافة صفوف وشعب ---
 @app.route("/add_class", methods=["GET", "POST"])
 @login_required
@@ -49,58 +51,59 @@ def add_class():
         return redirect(url_for("dashboard"))
 
     conn = db.get_db_connection()
-    teachers = conn.execute(
+    # جلب المعلمين للمدرسة لعرضهم في الاختيار
+    teachers_list = conn.execute(
         "SELECT * FROM teachers WHERE school_id = ?", (session["school_id"],)
     ).fetchall()
 
     if request.method == "POST":
-        teacher_id = request.form.get("teacher_id")
         class_name = request.form.get("class_name")
         section = request.form.get("section")
+        period = request.form.get("period") or "صباحي"
+        teacher_ids = request.form.getlist("teacher_ids")  # ✅ دعم معلمين متعددين
 
-        if teacher_id and class_name and section:
-            conn.execute(
-                "INSERT INTO teacher_classes (teacher_id, class_name, section) VALUES (?, ?, ?)",
-                (teacher_id, class_name, section),
+        if class_name and section and teacher_ids:
+            # إضافة الصف أولاً
+            cur = conn.execute(
+                "INSERT INTO teacher_classes (class_name, section, period) VALUES (?, ?, ?)",
+                (class_name, section, period)
             )
+            class_id = cur.lastrowid
+
+            # ربط المعلمين بالصف
+            for t_id in teacher_ids:
+                conn.execute(
+                    "INSERT INTO class_teachers (class_id, teacher_id) VALUES (?, ?)",
+                    (class_id, t_id)
+                )
+
             conn.commit()
             flash("✅ تم إضافة الصف والشعبة بنجاح")
             conn.close()
             return redirect(url_for("list_classes"))
         else:
-            flash("⚠️ يرجى تعبئة جميع الحقول")
+            flash("⚠️ يرجى تعبئة جميع الحقول واختيار المعلمين")
 
     conn.close()
-    return render_template("add_class.html", teachers=teachers)
+    return render_template("add_class.html", teachers=teachers_list)
 
 
-# --- ✅ عرض جميع الصفوف والشعب الخاصة بالمدرسة ---
+# --- ✅ عرض جميع الصفوف والشعب مع المعلمين ---
 @app.route("/classes")
 @login_required
 def list_classes():
     conn = db.get_db_connection()
     rows = conn.execute("""
-        SELECT tc.id, tc.class_name, tc.section, t.teacher_name
+        SELECT tc.id, tc.class_name, tc.section, tc.period,
+               GROUP_CONCAT(t.teacher_name, ', ') AS teacher_names
         FROM teacher_classes tc
-        JOIN teachers t ON tc.teacher_id = t.id
-        WHERE t.school_id = ?
+        LEFT JOIN class_teachers ct ON tc.id = ct.class_id
+        LEFT JOIN teachers t ON ct.teacher_id = t.id
+        WHERE t.school_id = ? OR t.id IS NULL
+        GROUP BY tc.id
     """, (session["school_id"],)).fetchall()
     conn.close()
     return render_template("list_classes.html", classes=rows)
-
-
-# --- ✅ حذف صف/شعبة ---
-@app.route("/classes/delete/<int:class_id>", methods=["POST"])
-@login_required
-def delete_class(class_id):
-    if session.get("role") != "admin":
-        return jsonify({"success": False, "message": "غير مسموح"})
-
-    conn = db.get_db_connection()
-    conn.execute("DELETE FROM teacher_classes WHERE id = ?", (class_id,))
-    conn.commit()
-    conn.close()
-    return jsonify({"success": True, "message": "تم الحذف بنجاح"})
 
 
 # --- ✅ تعديل صف/شعبة ---
@@ -112,7 +115,7 @@ def edit_class(class_id):
         return redirect(url_for("dashboard"))
 
     conn = db.get_db_connection()
-    teachers = conn.execute(
+    teachers_list = conn.execute(
         "SELECT * FROM teachers WHERE school_id = ?", (session["school_id"],)
     ).fetchall()
 
@@ -120,34 +123,56 @@ def edit_class(class_id):
         "SELECT * FROM teacher_classes WHERE id = ?", (class_id,)
     ).fetchone()
 
+    # جلب المعلمين المرتبطين بالصف
+    current_teachers = conn.execute(
+        "SELECT teacher_id FROM class_teachers WHERE class_id = ?", (class_id,)
+    ).fetchall()
+    current_teacher_ids = [t['teacher_id'] for t in current_teachers]
+
     if not class_row:
         conn.close()
         flash("⚠️ الصف/الشعبة غير موجود")
         return redirect(url_for("list_classes"))
 
     if request.method == "POST":
-        teacher_id = request.form.get("teacher_id")
         class_name = request.form.get("class_name")
         section = request.form.get("section")
+        period = request.form.get("period") or "صباحي"
+        teacher_ids = request.form.getlist("teacher_ids")
 
-        if teacher_id and class_name and section:
+        if class_name and section and teacher_ids:
+            # تحديث بيانات الصف
             conn.execute("""
                 UPDATE teacher_classes
-                SET teacher_id = ?, class_name = ?, section = ?
+                SET class_name = ?, section = ?, period = ?
                 WHERE id = ?
-            """, (teacher_id, class_name, section, class_id))
+            """, (class_name, section, period, class_id))
+
+            # تحديث المعلمين المرتبطين بالصف
+            conn.execute("DELETE FROM class_teachers WHERE class_id = ?", (class_id,))
+            for t_id in teacher_ids:
+                conn.execute(
+                    "INSERT INTO class_teachers (class_id, teacher_id) VALUES (?, ?)",
+                    (class_id, t_id)
+                )
+
             conn.commit()
             conn.close()
             flash("✅ تم تعديل الصف والشعبة بنجاح")
             return redirect(url_for("list_classes"))
         else:
-            flash("⚠️ يرجى تعبئة جميع الحقول")
+            flash("⚠️ يرجى تعبئة جميع الحقول واختيار المعلمين")
 
     conn.close()
-    return render_template("edit_class.html", class_data=class_row, teachers=teachers)
+    return render_template(
+        "edit_class.html",
+        class_data=class_row,
+        teachers=teachers_list,
+        current_teacher_ids=current_teacher_ids
+    )
 
 
-# --- إنشاء الجداول ---
+# --- ✅ إنشاء الجداول الافتراضية ---
 db.create_tables()
 db.seed_data()
 

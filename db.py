@@ -9,6 +9,7 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
+# --- ✅ إنشاء الجداول الأساسية ---
 def create_tables():
     conn = get_db_connection()
     cur = conn.cursor()
@@ -35,14 +36,25 @@ def create_tables():
     )
     """)
 
-    # جدول شعب المعلمين
+    # جدول الصفوف
     cur.execute("""
     CREATE TABLE IF NOT EXISTS teacher_classes (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        teacher_id INTEGER NOT NULL,
         class_name TEXT NOT NULL,
         section TEXT,
-        FOREIGN KEY(teacher_id) REFERENCES teachers(id)
+        period TEXT DEFAULT 'صباحي'
+    )
+    """)
+
+    # جدول وسيط لربط الصفوف بالمعلمين (دعم أكثر من معلم لكل صف)
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS class_teachers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        class_id INTEGER NOT NULL,
+        teacher_id INTEGER NOT NULL,
+        FOREIGN KEY(class_id) REFERENCES teacher_classes(id) ON DELETE CASCADE,
+        FOREIGN KEY(teacher_id) REFERENCES teachers(id) ON DELETE CASCADE,
+        UNIQUE(class_id, teacher_id)
     )
     """)
 
@@ -55,10 +67,9 @@ def create_tables():
     conn.commit()
     conn.close()
 
+
+# --- ✅ إضافة بيانات وهمية (Seed) ---
 def seed_data():
-    """
-    إضافة بيانات وهمية: مدارس، معلمين، وشعب
-    """
     conn = get_db_connection()
     cur = conn.cursor()
 
@@ -73,10 +84,11 @@ def seed_data():
         VALUES (?, ?, ?)
         """, (s['school_name'], s['admin_username'], s['admin_password']))
 
-    # المعلمين لكل مدرسة
+    # جلب المدارس
     cur.execute("SELECT * FROM schools")
     school_rows = cur.fetchall()
 
+    # معلمين وهميين
     teachers = [
         {"teacher_name": "أحمد", "username": "ahmed", "password": generate_password_hash("123"), "school_id": school_rows[0]['id']},
         {"teacher_name": "سعاد", "username": "suad", "password": generate_password_hash("123"), "school_id": school_rows[0]['id']},
@@ -89,34 +101,46 @@ def seed_data():
         VALUES (?, ?, ?, ?)
         """, (t['teacher_name'], t['username'], t['password'], t['school_id']))
 
-    # إضافة شعب لكل معلم
-    cur.execute("SELECT * FROM teachers")
-    teacher_rows = cur.fetchall()
-
+    # إضافة صفوف
     classes = [
-        {"teacher_id": teacher_rows[0]['id'], "class_name": "الصف السابع", "section": "أ"},
-        {"teacher_id": teacher_rows[0]['id'], "class_name": "الصف الثامن", "section": "ب"},
-        {"teacher_id": teacher_rows[1]['id'], "class_name": "الصف السابع", "section": "ب"},
-        {"teacher_id": teacher_rows[2]['id'], "class_name": "الصف التاسع", "section": "أ"},
-        {"teacher_id": teacher_rows[3]['id'], "class_name": "الصف التاسع", "section": "ب"}
+        {"class_name": "الصف السابع", "section": "أ", "period": "صباحي"},
+        {"class_name": "الصف الثامن", "section": "ب", "period": "صباحي"},
+        {"class_name": "الصف السابع", "section": "ب", "period": "صباحي"},
+        {"class_name": "الصف التاسع", "section": "أ", "period": "صباحي"},
+        {"class_name": "الصف التاسع", "section": "ب", "period": "صباحي"}
     ]
     for c in classes:
         cur.execute("""
-        INSERT OR IGNORE INTO teacher_classes (teacher_id, class_name, section)
+        INSERT OR IGNORE INTO teacher_classes (class_name, section, period)
         VALUES (?, ?, ?)
-        """, (c['teacher_id'], c['class_name'], c['section']))
+        """, (c['class_name'], c['section'], c['period']))
+
+    # ربط الصفوف بالمعلمين في جدول class_teachers
+    cur.execute("SELECT * FROM teacher_classes")
+    class_rows = cur.fetchall()
+    cur.execute("SELECT * FROM teachers")
+    teacher_rows = cur.fetchall()
+
+    class_teacher_links = [
+        {"class_id": class_rows[0]['id'], "teacher_id": teacher_rows[0]['id']},
+        {"class_id": class_rows[1]['id'], "teacher_id": teacher_rows[0]['id']},
+        {"class_id": class_rows[2]['id'], "teacher_id": teacher_rows[1]['id']},
+        {"class_id": class_rows[3]['id'], "teacher_id": teacher_rows[2]['id']},
+        {"class_id": class_rows[4]['id'], "teacher_id": teacher_rows[3]['id']}
+    ]
+    for link in class_teacher_links:
+        cur.execute("""
+        INSERT OR IGNORE INTO class_teachers (class_id, teacher_id)
+        VALUES (?, ?)
+        """, (link['class_id'], link['teacher_id']))
 
     conn.commit()
     conn.close()
     print("✅ تم إنشاء الجداول وإضافة بيانات وهمية بنجاح")
 
+
+# --- ✅ إضافة مدرسة جديدة مع المعلمين ---
 def add_school(school_name, admin_username, admin_password, teachers_list=None):
-    """
-    إضافة مدرسة جديدة مع مديرها وأي معلمين.
-    teachers_list = [
-        {"teacher_name": "...", "username": "...", "password": "..."}
-    ]
-    """
     conn = get_db_connection()
     cur = conn.cursor()
 
@@ -139,12 +163,12 @@ def add_school(school_name, admin_username, admin_password, teachers_list=None):
     conn.close()
     print(f"✅ تم إضافة المدرسة '{school_name}' بنجاح")
 
+
 # --- التنفيذ عند تشغيل الملف مباشرة ---
 if __name__ == "__main__":
     create_tables()
     seed_data()
 
-    # إضافة مدرسة جديدة بأدمن ومعلمين
     add_school(
         "مدرسة الربيع",
         "admin_rabea",
