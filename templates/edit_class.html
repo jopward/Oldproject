@@ -1,0 +1,34 @@
+{% include 'partials/header.html' %}
+{% include 'partials/navbar.html' %}
+
+<div class="container mt-4">
+  <h3 class="mb-3">تعديل الصف والشعبة</h3>
+
+  <form method="post">
+    <div class="mb-3">
+      <label for="class_name" class="form-label">اسم الصف</label>
+      <input type="text" class="form-control" id="class_name" name="class_name" value="{{ class_data.class_name }}" required>
+    </div>
+
+    <div class="mb-3">
+      <label for="section" class="form-label">الشعبة</label>
+      <input type="text" class="form-control" id="section" name="section" value="{{ class_data.section }}" required>
+    </div>
+
+    <div class="mb-3">
+      <label for="teacher_id" class="form-label">المعلم</label>
+      <select class="form-select" name="teacher_id" required>
+        {% for t in teachers %}
+          <option value="{{ t.id }}" {% if t.id == class_data.teacher_id %}selected{% endif %}>
+            {{ t.teacher_name }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <button type="submit" class="btn btn-primary">حفظ التغييرات</button>
+    <a href="{{ url_for('list_classes') }}" class="btn btn-secondary">رجوع</a>
+  </form>
+</div>
+
+{% include 'partials/footer.html' %}

@@ -19,6 +19,17 @@
                 <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('reports_page') }}">التقارير</a>
                 </li>
+
+                {# روابط إضافية للمدير فقط #}
+                {% if session.get('role') == 'admin' %}
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('teachers_page') }}">المعلمين</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('list_classes') }}">الصفوف والشعب</a>
+                </li>
+                {% endif %}
+
                 <li class="nav-item">
                     <a class="nav-link text-danger" href="{{ url_for('logout') }}">تسجيل خروج</a>
                 </li>

@@ -1,0 +1,55 @@
+{% include 'partials/header.html' %}
+{% include 'partials/navbar.html' %}
+
+<div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h3>الصفوف والشعب</h3>
+    <a href="{{ url_for('add_class') }}" class="btn btn-success">➕ إضافة صف جديد</a>
+  </div>
+
+  {% if classes %}
+  <table class="table table-bordered table-striped">
+    <thead class="table-light">
+      <tr>
+        <th>الصف</th>
+        <th>الشعبة</th>
+        <th>المعلم</th>
+        <th>إجراءات</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in classes %}
+      <tr id="row-{{ c.id }}">
+        <td>{{ c.class_name }}</td>
+        <td>{{ c.section }}</td>
+        <td>{{ c.teacher_name }}</td>
+        <td>
+          <a href="{{ url_for('edit_class', class_id=c.id) }}" class="btn btn-sm btn-warning">✏️ تعديل</a>
+          <button class="btn btn-sm btn-danger" onclick="deleteClass({{ c.id }})">🗑️ حذف</button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="alert alert-info">⚠️ لا يوجد صفوف مضافة بعد.</div>
+  {% endif %}
+</div>
+
+<script>
+function deleteClass(id) {
+  if (!confirm("هل أنت متأكد من الحذف؟")) return;
+  fetch(`/classes/delete/${id}`, {method: "POST"})
+    .then(r => r.json())
+    .then(data => {
+      if (data.success) {
+        document.getElementById(`row-${id}`).remove();
+        alert("✅ " + data.message);
+      } else {
+        alert("⚠️ " + data.message);
+      }
+    });
+}
+</script>
+
+{% include 'partials/footer.html' %}

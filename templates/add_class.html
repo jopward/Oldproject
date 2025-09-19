@@ -1,0 +1,46 @@
+{% include 'partials/header.html' %}
+{% include 'partials/navbar.html' %}
+
+<div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h3>➕ إضافة صف وشعبة جديدة</h3>
+    <a href="{{ url_for('list_classes') }}" class="btn btn-secondary">🔙 رجوع للصفوف</a>
+  </div>
+
+  <!-- رسائل التنبيه -->
+  {% with messages = get_flashed_messages() %}
+    {% if messages %}
+      <div class="alert alert-info">
+        {% for msg in messages %}
+          <div>{{ msg }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  <form method="POST" class="card p-4 shadow-sm rounded">
+    <div class="mb-3">
+      <label class="form-label">اختر المعلم</label>
+      <select name="teacher_id" class="form-select" required>
+        <option value="">-- اختر --</option>
+        {% for teacher in teachers %}
+        <option value="{{ teacher.id }}">{{ teacher.teacher_name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">اسم الصف</label>
+      <input type="text" name="class_name" class="form-control" placeholder="مثال: الصف السابع" required>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">الشعبة</label>
+      <input type="text" name="section" class="form-control" placeholder="مثال: أ" required>
+    </div>
+
+    <button type="submit" class="btn btn-primary">💾 حفظ</button>
+  </form>
+</div>
+
+{% include 'partials/footer.html' %}
