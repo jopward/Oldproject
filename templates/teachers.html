@@ -1,0 +1,115 @@
+<!-- templates/teachers.html -->
+{% include "partials/header.html" %}
+{% include "partials/navbar.html" %}
+
+<div class="container mt-4">
+    <h2 class="mb-3">المعلمين</h2>
+
+    <!-- زر إضافة معلم يظهر للأدمن فقط -->
+    {% if session.role == 'admin' %}
+    <button class="btn btn-success mb-3" data-bs-toggle="modal" data-bs-target="#addTeacherModal">
+        إضافة معلم جديد
+    </button>
+    {% endif %}
+
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>الاسم</th>
+                    <th>اسم المستخدم</th>
+                    {% if session.role == 'admin' %}
+                    <th>الإجراءات</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for teacher in teachers %}
+                <tr>
+                    <td>{{ teacher.teacher_name }}</td>
+                    <td>{{ teacher.username }}</td>
+                    {% if session.role == 'admin' %}
+                    <td>
+                        <button class="btn btn-danger btn-sm" onclick="deleteTeacher({{ teacher.id }})">
+                            حذف
+                        </button>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- نموذج إضافة معلم جديد للأدمن -->
+{% if session.role == 'admin' %}
+<div class="modal fade" id="addTeacherModal" tabindex="-1" aria-labelledby="addTeacherModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form id="addTeacherForm">
+        <div class="modal-header">
+          <h5 class="modal-title" id="addTeacherModalLabel">إضافة معلم جديد</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+            <div class="mb-3">
+                <label for="teacher_name" class="form-label">اسم المعلم</label>
+                <input type="text" class="form-control" id="teacher_name" name="teacher_name" required>
+            </div>
+            <div class="mb-3">
+                <label for="username" class="form-label">اسم المستخدم</label>
+                <input type="text" class="form-control" id="username" name="username" required>
+            </div>
+            <div class="mb-3">
+                <label for="password" class="form-label">كلمة المرور</label>
+                <input type="password" class="form-control" id="password" name="password" required>
+            </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary">إضافة</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% include "partials/footer.html" %}
+
+<script>
+{% if session.role == 'admin' %}
+// حذف المعلم
+function deleteTeacher(id) {
+    if (confirm("هل أنت متأكد من حذف هذا المعلم؟")) {
+        fetch(`/teachers/delete/${id}`, {method: "POST"})
+        .then(res => res.json())
+        .then(data => {
+            if(data.success) location.reload();
+            else alert(data.message);
+        });
+    }
+}
+
+// إضافة معلم جديد
+document.getElementById('addTeacherForm')?.addEventListener('submit', function(e){
+    e.preventDefault();
+    const formData = new FormData(this);
+    fetch('/teachers/add', {
+        method: 'POST',
+        body: formData
+    }).then(res => res.json())
+      .then(data => {
+          if(data.success){
+              alert(data.message);
+              location.reload();
+          } else {
+              alert(data.message);
+          }
+      }).catch(err => {
+          console.error(err);
+          alert('حدث خطأ أثناء الإرسال');
+      });
+});
+{% endif %}
+</script>
