@@ -42,7 +42,12 @@
             <tbody>
                 {% for student in students %}
                 <tr data-class="{{ student.class_name }}" data-section="{{ student.section }}" class="{% if loop.index0 % 2 == 0 %}table-white{% else %}table-secondary{% endif %}">
-                    <td>{{ student.student_name }}</td>
+                    <!-- العمود الأول: رابط للصفحة التفصيلية -->
+                    <td>
+                        <a href="{{ url_for('student_detail', student_id=student.id) }}">
+                            {{ student.student_name }}
+                        </a>
+                    </td>
                     <td class="clickable" data-student="{{ student.id }}" data-status="present">{{ student.present_count or 0 }}</td>
                     <td class="clickable" data-student="{{ student.id }}" data-status="late">{{ student.late_count or 0 }}</td>
                     <td class="clickable" data-student="{{ student.id }}" data-status="absent">{{ student.absent_count or 0 }}</td>

@@ -36,6 +36,9 @@ app.add_url_rule('/reports', 'reports_page', reports_module.reports_page)
 app.add_url_rule('/get_attendance_details/<int:student_id>/<status>', 'get_attendance_details', reports_module.get_attendance_details)
 app.add_url_rule('/get_tracking_details/<int:student_id>/<field>', 'get_tracking_details', reports_module.get_tracking_details)
 
+# ✅ صفحة تفاصيل الطالب
+app.add_url_rule('/student/<int:student_id>', 'student_detail', reports_module.student_detail)
+
 # teachers
 app.add_url_rule('/teachers', 'teachers_page', teachers.teachers_page, methods=['GET'])
 app.add_url_rule('/teachers/delete/<int:teacher_id>', 'delete_teacher', teachers.delete_teacher, methods=['POST'])

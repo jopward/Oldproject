@@ -46,7 +46,7 @@ def create_tables():
     )
     """)
 
-    # جدول وسيط لربط الصفوف بالمعلمين (دعم أكثر من معلم لكل صف)
+    # جدول وسيط لربط الصفوف بالمعلمين
     cur.execute("""
     CREATE TABLE IF NOT EXISTS class_teachers (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -55,6 +55,56 @@ def create_tables():
         FOREIGN KEY(class_id) REFERENCES teacher_classes(id) ON DELETE CASCADE,
         FOREIGN KEY(teacher_id) REFERENCES teachers(id) ON DELETE CASCADE,
         UNIQUE(class_id, teacher_id)
+    )
+    """)
+
+    # --- ✅ الجداول الجديدة للمواد ---
+    # جدول المواد
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS subjects (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        subject_name TEXT NOT NULL UNIQUE
+    )
+    """)
+
+    # جدول ربط المعلمين بالمواد
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS teacher_subjects (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        teacher_id INTEGER NOT NULL,
+        subject_id INTEGER NOT NULL,
+        FOREIGN KEY (teacher_id) REFERENCES teachers(id) ON DELETE CASCADE,
+        FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE,
+        UNIQUE (teacher_id, subject_id)
+    )
+    """)
+
+    # جدول ربط المواد بالصفوف والمعلمين
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS class_subjects (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        class_id INTEGER NOT NULL,
+        subject_id INTEGER NOT NULL,
+        teacher_id INTEGER NOT NULL,
+        FOREIGN KEY (class_id) REFERENCES teacher_classes(id) ON DELETE CASCADE,
+        FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE,
+        FOREIGN KEY (teacher_id) REFERENCES teachers(id) ON DELETE CASCADE,
+        UNIQUE (class_id, subject_id, teacher_id)
+    )
+    """)
+
+    # --- ✅ جدول تتبع الطلاب ---
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS student_tracking (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        student_id INTEGER NOT NULL,
+        class_id INTEGER NOT NULL,
+        school_id INTEGER NOT NULL,
+        tracking_date TEXT NOT NULL,
+        note TEXT,
+        FOREIGN KEY(student_id) REFERENCES students(id) ON DELETE CASCADE,
+        FOREIGN KEY(class_id) REFERENCES teacher_classes(id) ON DELETE CASCADE,
+        FOREIGN KEY(school_id) REFERENCES schools(id) ON DELETE CASCADE
     )
     """)
 
@@ -133,6 +183,28 @@ def seed_data():
         INSERT OR IGNORE INTO class_teachers (class_id, teacher_id)
         VALUES (?, ?)
         """, (link['class_id'], link['teacher_id']))
+
+    # --- ✅ إضافة مواد وهمية ---
+    subjects = ["لغة عربية", "لغة إنجليزية", "رياضيات", "مهارات رقمية"]
+    for subj in subjects:
+        cur.execute("INSERT OR IGNORE INTO subjects (subject_name) VALUES (?)", (subj,))
+
+    # جلب المواد والمعلمين
+    cur.execute("SELECT * FROM subjects")
+    subject_rows = cur.fetchall()
+
+    # ربط معلمين بموادهم
+    teacher_subjects_links = [
+        {"teacher_id": teacher_rows[0]['id'], "subject_id": subject_rows[2]['id']},  # أحمد -> رياضيات
+        {"teacher_id": teacher_rows[1]['id'], "subject_id": subject_rows[0]['id']},  # سعاد -> لغة عربية
+        {"teacher_id": teacher_rows[2]['id'], "subject_id": subject_rows[1]['id']},  # محمود -> لغة إنجليزية
+        {"teacher_id": teacher_rows[3]['id'], "subject_id": subject_rows[3]['id']}   # منى -> مهارات رقمية
+    ]
+    for link in teacher_subjects_links:
+        cur.execute("""
+        INSERT OR IGNORE INTO teacher_subjects (teacher_id, subject_id)
+        VALUES (?, ?)
+        """, (link['teacher_id'], link['subject_id']))
 
     conn.commit()
     conn.close()

@@ -1,0 +1,62 @@
+{% include 'partials/header.html' %}
+{% include 'partials/navbar.html' %}
+
+<div class="container my-4">
+
+    <!-- رأس الصفحة مع زر رجوع -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3 class="text-center flex-grow-1">{{ school_name }}</h3>
+        <a href="{{ url_for('reports_page') }}" class="btn btn-outline-secondary">رجوع إلى التقارير</a>
+    </div>
+
+    <!-- معلومات الطالب -->
+    <div class="mb-4 border p-3 rounded bg-light shadow-sm">
+        <h5>الطالب: {{ student.student_name }}</h5>
+        <p>
+            الصف: {{ student.class_name }} | الشعبة: {{ student.section }}<br>
+            {% if student.teacher_name %}
+            المعلم: {{ student.teacher_name }}
+            {% endif %}
+        </p>
+    </div>
+
+    <!-- إحصائيات الحضور والغياب -->
+    <div class="mb-4 p-3 rounded bg-white shadow-sm border">
+        <h5 class="mb-3">إحصائيات الحضور والغياب</h5>
+        <div class="row text-center">
+            <div class="col-md-3 border-end"><strong>حاضر:</strong> {{ student.present_count or 0 }} يوم</div>
+            <div class="col-md-3 border-end"><strong>متأخر:</strong> {{ student.late_count or 0 }} يوم</div>
+            <div class="col-md-3 border-end"><strong>غائب:</strong> {{ student.absent_count or 0 }} يوم</div>
+            <div class="col-md-3"><strong>إجمالي الأيام:</strong> {{ (student.present_count or 0) + (student.late_count or 0) + (student.absent_count or 0) }}</div>
+        </div>
+    </div>
+
+    <!-- عرض الملاحظات لكل مادة -->
+    {% for subject, notes in tracking_data.items() %}
+    <div class="mb-4">
+        <h5 class="bg-primary text-white p-2 rounded">{{ subject }}</h5>
+
+        <div class="list-group">
+            {% for n in notes %}
+            <div class="list-group-item mb-2 border rounded shadow-sm">
+                <div class="d-flex justify-content-between flex-wrap">
+                    <div><strong>تاريخ التتبع:</strong> {{ n.tracking_date }}</div>
+                    <div><strong>الحضور:</strong> {{ n.attendance_status }}</div>
+                    <div><strong>المعلم:</strong> {{ n.teacher_name }}</div>
+                </div>
+                <div class="row mt-2 text-center">
+                    <div class="col-md-3 border-end"><strong>واجب:</strong> {{ n.homework }}</div>
+                    <div class="col-md-3 border-end"><strong>كتاب:</strong> {{ n.book }}</div>
+                    <div class="col-md-3 border-end"><strong>مشاركة:</strong> {{ n.participation }}</div>
+                    <div class="col-md-3"><strong>سلوك:</strong> {{ n.misbehavior }}</div>
+                </div>
+                <div class="mt-2"><strong>ملاحظة:</strong> {{ n.note or "لا توجد ملاحظات" }}</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+
+</div>
+
+{% include 'partials/footer.html' %}
