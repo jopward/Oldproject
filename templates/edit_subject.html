@@ -1,0 +1,32 @@
+{% include 'partials/header.html' %}
+{% include 'partials/navbar.html' %}
+
+<div class="container my-4">
+
+    <h3 class="text-center mb-4">تعديل المادة والمعلمين</h3>
+
+    <div class="card shadow-sm p-4">
+        <form method="POST" action="{{ url_for('edit_subject', subject_id=subject.id) }}">
+            <div class="mb-3">
+                <label for="subject_name" class="form-label">اسم المادة</label>
+                <input type="text" class="form-control" id="subject_name" name="subject_name" value="{{ subject.subject_name }}" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">اختر المعلمين</label>
+                <select class="form-select" name="teacher_ids" multiple required>
+                    {% for teacher in teachers %}
+                        <option value="{{ teacher.id }}" {% if teacher.id in current_teacher_ids %}selected{% endif %}>
+                            {{ teacher.teacher_name }}
+                        </option>
+                    {% endfor %}
+                </select>
+                <small class="form-text text-muted">اضغط Ctrl أو Cmd لاختيار أكثر من معلم</small>
+            </div>
+            <button type="submit" class="btn btn-primary">حفظ التعديلات</button>
+            <a href="{{ url_for('subjects_page') }}" class="btn btn-secondary">إلغاء</a>
+        </form>
+    </div>
+
+</div>
+
+{% include 'partials/footer.html' %}

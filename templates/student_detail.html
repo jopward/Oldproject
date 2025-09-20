@@ -3,10 +3,13 @@
 
 <div class="container my-4">
 
-    <!-- رأس الصفحة مع زر رجوع -->
-    <div class="d-flex justify-content-between align-items-center mb-3">
+    <!-- رأس الصفحة مع زر رجوع وإغلاق -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
         <h3 class="text-center flex-grow-1">{{ school_name }}</h3>
-        <a href="{{ url_for('reports_page') }}" class="btn btn-outline-secondary">رجوع إلى التقارير</a>
+        <div>
+            <a href="{{ url_for('reports_page') }}" class="btn btn-outline-secondary me-2">رجوع إلى التقارير</a>
+            <a href="javascript:window.close();" class="btn btn-outline-danger">✖ إغلاق الصفحة</a>
+        </div>
     </div>
 
     <!-- معلومات الطالب -->
@@ -22,7 +25,7 @@
 
     <!-- إحصائيات الحضور والغياب -->
     <div class="mb-4 p-3 rounded bg-white shadow-sm border">
-        <h5 class="mb-3">إحصائيات الحضور والغياب</h5>
+        <h5 class="mb-3 text-center">إحصائيات الحضور والغياب</h5>
         <div class="row text-center">
             <div class="col-md-3 border-end"><strong>حاضر:</strong> {{ student.present_count or 0 }} يوم</div>
             <div class="col-md-3 border-end"><strong>متأخر:</strong> {{ student.late_count or 0 }} يوم</div>
@@ -31,26 +34,45 @@
         </div>
     </div>
 
+    <!-- أدوات البحث والفلترة -->
+    <div class="mb-4">
+        <input type="text" id="searchInput" class="form-control mb-2" placeholder="بحث داخل الملاحظات...">
+        <select id="filterSelect" class="form-select">
+            <option value="all">عرض كل الملاحظات</option>
+            <option value="homework">الواجب</option>
+            <option value="book">الكتاب</option>
+            <option value="participation">المشاركة</option>
+            <option value="misbehavior">السلوك</option>
+        </select>
+    </div>
+
     <!-- عرض الملاحظات لكل مادة -->
     {% for subject, notes in tracking_data.items() %}
-    <div class="mb-4">
-        <h5 class="bg-primary text-white p-2 rounded">{{ subject }}</h5>
-
-        <div class="list-group">
+    <div class="mb-3 subject-section" data-subject="{{ subject }}">
+        <button class="btn btn-primary w-100 text-start mb-2 d-flex justify-content-between align-items-center" type="button" data-bs-toggle="collapse" data-bs-target="#subject-{{ loop.index }}" aria-expanded="true" aria-controls="subject-{{ loop.index }}">
+            <span>{{ subject }}</span>
+            <span class="badge bg-light text-dark">{{ notes|length }} ملاحظة</span>
+        </button>
+        <div class="collapse show" id="subject-{{ loop.index }}">
             {% for n in notes %}
-            <div class="list-group-item mb-2 border rounded shadow-sm">
-                <div class="d-flex justify-content-between flex-wrap">
-                    <div><strong>تاريخ التتبع:</strong> {{ n.tracking_date }}</div>
-                    <div><strong>الحضور:</strong> {{ n.attendance_status }}</div>
-                    <div><strong>المعلم:</strong> {{ n.teacher_name }}</div>
+            <div class="card mb-3 shadow-sm note-card" 
+                 data-homework="{{ n.homework or '' }}" 
+                 data-book="{{ n.book or '' }}" 
+                 data-participation="{{ n.participation or '' }}" 
+                 data-misbehavior="{{ n.misbehavior or '' }}">
+                <div class="card-header d-flex justify-content-between flex-wrap p-2 text-white"
+                     style="background-color: {% if n.homework %}#0d6efd{% elif n.book %}#6f42c1{% elif n.participation %}#198754{% elif n.misbehavior %}#dc3545{% else %}#343a40{% endif %};">
+                    <span>{{ n.tracking_date }} | {{ subject }}</span>
+                    <span>المعلم: {{ n.teacher_name }}</span>
+                    <span class="badge bg-warning text-dark">{{ n.attendance_status }}</span>
                 </div>
-                <div class="row mt-2 text-center">
-                    <div class="col-md-3 border-end"><strong>واجب:</strong> {{ n.homework }}</div>
-                    <div class="col-md-3 border-end"><strong>كتاب:</strong> {{ n.book }}</div>
-                    <div class="col-md-3 border-end"><strong>مشاركة:</strong> {{ n.participation }}</div>
-                    <div class="col-md-3"><strong>سلوك:</strong> {{ n.misbehavior }}</div>
+                <div class="card-body row text-center">
+                    <div class="col-md-3 border-end mb-2"><i class="bi bi-journal-check"></i> واجب: {{ n.homework or "لا يوجد" }}</div>
+                    <div class="col-md-3 border-end mb-2"><i class="bi bi-book"></i> كتاب: {{ n.book or "لا يوجد" }}</div>
+                    <div class="col-md-3 border-end mb-2"><i class="bi bi-people"></i> مشاركة: {{ n.participation or "لا يوجد" }}</div>
+                    <div class="col-md-3 mb-2"><i class="bi bi-exclamation-triangle"></i> سلوك: {{ n.misbehavior or "لا يوجد" }}</div>
                 </div>
-                <div class="mt-2"><strong>ملاحظة:</strong> {{ n.note or "لا توجد ملاحظات" }}</div>
+                <div class="card-footer"><strong>ملاحظة:</strong> {{ n.note or "لا توجد ملاحظات" }}</div>
             </div>
             {% endfor %}
         </div>
@@ -58,5 +80,26 @@
     {% endfor %}
 
 </div>
+
+<script>
+    const searchInput = document.getElementById('searchInput');
+    const filterSelect = document.getElementById('filterSelect');
+    const noteCards = document.querySelectorAll('.note-card');
+
+    function filterNotes() {
+        const searchTerm = searchInput.value.toLowerCase();
+        const filterType = filterSelect.value;
+
+        noteCards.forEach(card => {
+            const text = card.innerText.toLowerCase();
+            const hasFilter = filterType === 'all' || card.dataset[filterType].toLowerCase().includes('لا يوجد') === false;
+            const matchesSearch = text.includes(searchTerm);
+            card.style.display = (hasFilter && matchesSearch) ? '' : 'none';
+        });
+    }
+
+    searchInput.addEventListener('input', filterNotes);
+    filterSelect.addEventListener('change', filterNotes);
+</script>
 
 {% include 'partials/footer.html' %}

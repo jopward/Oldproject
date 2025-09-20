@@ -31,16 +31,22 @@ def reports_page():
 @login_required
 def student_detail(student_id):
     """
-    صفحة تفصيلية لكل طالب تعرض المواد والملاحظات لكل مادة.
+    صفحة تفصيلية لكل طالب تعرض المواد والملاحظات لكل مادة،
+    مع إحصائيات الحضور والغياب.
     """
     conn = get_db_connection()
     
-    # جلب اسم المدرسة والطالب
-    school = conn.execute('''
-        SELECT sch.school_name, s.student_name, s.class_name, s.section
+    # جلب بيانات الطالب + اسم المدرسة + إحصائيات الحضور والغياب
+    student = conn.execute('''
+        SELECT s.id, s.student_name, s.class_name, s.section, sch.school_name,
+               SUM(CASE WHEN a.status='present' THEN 1 ELSE 0 END) AS present_count,
+               SUM(CASE WHEN a.status='late' THEN 1 ELSE 0 END) AS late_count,
+               SUM(CASE WHEN a.status='absent' THEN 1 ELSE 0 END) AS absent_count
         FROM students s
         LEFT JOIN schools sch ON s.school_id = sch.id
+        LEFT JOIN attendance a ON s.id = a.student_id
         WHERE s.id=?
+        GROUP BY s.id
     ''', (student_id,)).fetchone()
     
     # جلب جميع الملاحظات والتتبع لكل مادة
@@ -79,8 +85,8 @@ def student_detail(student_id):
     
     return render_template(
         'student_detail.html',
-        school_name=school['school_name'],
-        student=school,
+        school_name=student['school_name'],
+        student=student,
         tracking_data=tracking_data
     )
 

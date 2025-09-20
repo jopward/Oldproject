@@ -1,0 +1,70 @@
+{% include 'partials/header.html' %}
+{% include 'partials/navbar.html' %}
+
+<div class="container my-4">
+
+    <!-- رأس الصفحة -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="text-center flex-grow-1">إدارة المواد والمعلمين</h3>
+    </div>
+
+    <!-- نموذج إضافة مادة جديدة -->
+    <div class="mb-4 p-3 border rounded bg-light shadow-sm">
+        <h5 class="mb-3">إضافة مادة جديدة</h5>
+        <form method="POST" action="{{ url_for('add_subject') }}">
+            <div class="mb-3">
+                <label for="subject_name" class="form-label">اسم المادة</label>
+                <input type="text" class="form-control" id="subject_name" name="subject_name" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label">اختر المعلمين</label>
+                <select class="form-select" name="teacher_ids" multiple required>
+                    {% for teacher in teachers %}
+                        <option value="{{ teacher.id }}">{{ teacher.teacher_name }}</option>
+                    {% endfor %}
+                </select>
+                <small class="form-text text-muted">اضغط Ctrl أو Cmd لاختيار أكثر من معلم</small>
+            </div>
+            <button type="submit" class="btn btn-primary">إضافة المادة</button>
+        </form>
+    </div>
+
+    <!-- قائمة المواد مع المعلمين -->
+    <div class="mb-4">
+        <h5 class="mb-3">المواد الحالية</h5>
+        {% set last_subject = None %}
+        {% for st in subject_teachers %}
+            {% if last_subject != st.subject_name %}
+                {% if not loop.first %}
+                    </ul>
+                </div>
+                {% endif %}
+                <div class="card mb-3 shadow-sm">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span>{{ st.subject_name }}</span>
+                        <div>
+                            <a href="{{ url_for('edit_subject', subject_id=st.subject_id) }}" class="btn btn-sm btn-outline-warning">تعديل</a>
+                            <form method="POST" action="{{ url_for('delete_subject', subject_id=st.subject_id) }}" style="display:inline;">
+                                <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('هل أنت متأكد من حذف هذه المادة؟');">حذف</button>
+                            </form>
+                        </div>
+                    </div>
+                    <ul class="list-group list-group-flush">
+                {% set last_subject = st.subject_name %}
+            {% endif %}
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                {{ st.teacher_name }}
+                <form method="POST" action="{{ url_for('remove_teacher_from_subject', st_id=st.id) }}" style="display:inline;">
+                    <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('هل تريد إزالة هذا المعلم من المادة؟');">إزالة</button>
+                </form>
+            </li>
+            {% if loop.last %}
+                    </ul>
+                </div>
+            {% endif %}
+        {% endfor %}
+    </div>
+
+</div>
+
+{% include 'partials/footer.html' %}

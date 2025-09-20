@@ -5,13 +5,14 @@ import students as students_module
 import tracking
 import reports as reports_module
 import db  # ✅ استدعاء db.py
-import teachers  # ملف teachers.py الجديد
+import teachers  # ملف teachers.py
+import subjects  # ملف subjects.py
 
-# --- ✅ تعريف التطبيق ---
+# --- تعريف التطبيق ---
 app = Flask(__name__)
 app.secret_key = 'your_secret_key_here'
 
-# --- ✅ تسجيل المسارات ---
+# --- تسجيل المسارات ---
 
 # auth
 app.add_url_rule('/login', 'login', login_view, methods=['GET', 'POST'])
@@ -35,8 +36,6 @@ app.add_url_rule('/update_note', 'update_note', tracking.update_note, methods=['
 app.add_url_rule('/reports', 'reports_page', reports_module.reports_page)
 app.add_url_rule('/get_attendance_details/<int:student_id>/<status>', 'get_attendance_details', reports_module.get_attendance_details)
 app.add_url_rule('/get_tracking_details/<int:student_id>/<field>', 'get_tracking_details', reports_module.get_tracking_details)
-
-# ✅ صفحة تفاصيل الطالب
 app.add_url_rule('/student/<int:student_id>', 'student_detail', reports_module.student_detail)
 
 # teachers
@@ -44,8 +43,14 @@ app.add_url_rule('/teachers', 'teachers_page', teachers.teachers_page, methods=[
 app.add_url_rule('/teachers/delete/<int:teacher_id>', 'delete_teacher', teachers.delete_teacher, methods=['POST'])
 app.add_url_rule('/teachers/add', 'add_teacher', teachers.add_teacher, methods=['POST'])
 
+# --- إدارة المواد (Subjects) ---
+app.add_url_rule('/subjects', 'subjects_page', subjects.subjects_page, methods=['GET'])
+app.add_url_rule('/subjects/add', 'add_subject', subjects.add_subject, methods=['POST'])
+app.add_url_rule('/subjects/edit/<int:subject_id>', 'edit_subject', subjects.edit_subject, methods=['GET', 'POST'])
+app.add_url_rule('/subjects/delete/<int:subject_id>', 'delete_subject', subjects.delete_subject, methods=['POST'])
+app.add_url_rule('/subjects/remove_teacher/<int:st_id>', 'remove_teacher_from_subject', subjects.remove_teacher_from_subject, methods=['POST'])
 
-# --- ✅ إضافة صفوف وشعب ---
+# --- إضافة صفوف وشعب ---
 @app.route("/add_class", methods=["GET", "POST"])
 @login_required
 def add_class():
@@ -54,7 +59,6 @@ def add_class():
         return redirect(url_for("dashboard"))
 
     conn = db.get_db_connection()
-    # جلب المعلمين للمدرسة لعرضهم في الاختيار
     teachers_list = conn.execute(
         "SELECT * FROM teachers WHERE school_id = ?", (session["school_id"],)
     ).fetchall()
@@ -63,23 +67,19 @@ def add_class():
         class_name = request.form.get("class_name")
         section = request.form.get("section")
         period = request.form.get("period") or "صباحي"
-        teacher_ids = request.form.getlist("teacher_ids")  # ✅ دعم معلمين متعددين
+        teacher_ids = request.form.getlist("teacher_ids")
 
         if class_name and section and teacher_ids:
-            # إضافة الصف أولاً
             cur = conn.execute(
                 "INSERT INTO teacher_classes (class_name, section, period) VALUES (?, ?, ?)",
                 (class_name, section, period)
             )
             class_id = cur.lastrowid
-
-            # ربط المعلمين بالصف
             for t_id in teacher_ids:
                 conn.execute(
                     "INSERT INTO class_teachers (class_id, teacher_id) VALUES (?, ?)",
                     (class_id, t_id)
                 )
-
             conn.commit()
             flash("✅ تم إضافة الصف والشعبة بنجاح")
             conn.close()
@@ -90,8 +90,6 @@ def add_class():
     conn.close()
     return render_template("add_class.html", teachers=teachers_list)
 
-
-# --- ✅ عرض جميع الصفوف والشعب مع المعلمين ---
 @app.route("/classes")
 @login_required
 def list_classes():
@@ -108,8 +106,6 @@ def list_classes():
     conn.close()
     return render_template("list_classes.html", classes=rows)
 
-
-# --- ✅ تعديل صف/شعبة ---
 @app.route("/classes/edit/<int:class_id>", methods=["GET", "POST"])
 @login_required
 def edit_class(class_id):
@@ -126,7 +122,6 @@ def edit_class(class_id):
         "SELECT * FROM teacher_classes WHERE id = ?", (class_id,)
     ).fetchone()
 
-    # جلب المعلمين المرتبطين بالصف
     current_teachers = conn.execute(
         "SELECT teacher_id FROM class_teachers WHERE class_id = ?", (class_id,)
     ).fetchall()
@@ -144,14 +139,12 @@ def edit_class(class_id):
         teacher_ids = request.form.getlist("teacher_ids")
 
         if class_name and section and teacher_ids:
-            # تحديث بيانات الصف
             conn.execute("""
                 UPDATE teacher_classes
                 SET class_name = ?, section = ?, period = ?
                 WHERE id = ?
             """, (class_name, section, period, class_id))
 
-            # تحديث المعلمين المرتبطين بالصف
             conn.execute("DELETE FROM class_teachers WHERE class_id = ?", (class_id,))
             for t_id in teacher_ids:
                 conn.execute(
@@ -174,8 +167,7 @@ def edit_class(class_id):
         current_teacher_ids=current_teacher_ids
     )
 
-
-# --- ✅ إنشاء الجداول الافتراضية ---
+# --- إنشاء الجداول الافتراضية ---
 db.create_tables()
 db.seed_data()
 
