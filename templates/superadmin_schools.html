@@ -1,0 +1,45 @@
+<!-- superadmin_schools.html -->
+
+<!-- تضمين الهيدر/ناف بار -->
+{% include 'navbar.html' %}
+
+<div class="container mt-4">
+    <h2>إدارة المدارس</h2>
+    
+    <!-- زر إضافة مدرسة جديدة -->
+    <a href="{{ url_for('add_school') }}" class="btn btn-primary mb-3">➕ إضافة مدرسة جديدة</a>
+
+    <!-- جدول عرض المدارس -->
+    <table class="table table-bordered table-striped">
+        <thead class="table-light">
+            <tr>
+                <th>الرقم</th>
+                <th>اسم المدرسة</th>
+                <th>مدير المدرسة</th>
+                <th>المعلمين</th>
+                <th>الطلاب</th>
+                <th>الإجراءات</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for school in schools %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ school.school_name }}</td>
+                <td>{{ school.school_admin }}</td>
+                <td>{{ school.teachers or 'لا يوجد' }}</td>
+                <td>{{ school.students or 'لا يوجد' }}</td>
+                <td>
+                    <a href="{{ url_for('edit_school', school_id=school.school_id) }}" class="btn btn-sm btn-warning">✏️ تعديل</a>
+                    <form action="{{ url_for('delete_school', school_id=school.school_id) }}" method="POST" style="display:inline-block;" onsubmit="return confirm('هل تريد حذف هذه المدرسة؟');">
+                        <button type="submit" class="btn btn-sm btn-danger">🗑️ حذف</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- تضمين الفوتر -->
+{% include 'footer.html' %}

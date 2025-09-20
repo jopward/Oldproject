@@ -20,7 +20,7 @@
                     <a class="nav-link" href="{{ url_for('reports_page') }}">التقارير</a>
                 </li>
 
-                {# روابط إضافية للمدير فقط #}
+                {# روابط للمدير فقط #}
                 {% if session.get('role') == 'admin' %}
                 <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('teachers_page') }}">المعلمين</a>
@@ -30,6 +30,13 @@
                 </li>
                 <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('subjects_page') }}">المواد</a>
+                </li>
+                {% endif %}
+
+                {# روابط للسوبر أدمن فقط #}
+                {% if session.get('role') == 'superadmin' %}
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ url_for('list_schools') }}">المدارس</a>
                 </li>
                 {% endif %}
 

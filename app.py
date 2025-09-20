@@ -167,6 +167,92 @@ def edit_class(class_id):
         current_teacher_ids=current_teacher_ids
     )
 
+# --- إدارة المدارس (Superadmin) ---
+@app.route("/schools")
+@login_required
+def list_schools():
+    if session.get("role") != "superadmin":
+        flash("❌ غير مسموح")
+        return redirect(url_for("dashboard"))
+
+    conn = db.get_db_connection()
+    schools = conn.execute("SELECT * FROM schools").fetchall()
+    conn.close()
+    return render_template("list_schools.html", schools=schools)
+
+@app.route("/schools/add", methods=["GET", "POST"])
+@login_required
+def add_school():
+    if session.get("role") != "superadmin":
+        flash("❌ غير مسموح")
+        return redirect(url_for("dashboard"))
+
+    if request.method == "POST":
+        school_name = request.form.get("school_name")
+        admin_username = request.form.get("admin_username")
+        admin_password = request.form.get("admin_password")
+
+        if school_name and admin_username and admin_password:
+            conn = db.get_db_connection()
+            conn.execute("""
+                INSERT INTO schools (school_name, admin_username, admin_password)
+                VALUES (?, ?, ?)
+            """, (school_name, admin_username, admin_password))
+            conn.commit()
+            conn.close()
+            flash("✅ تم إضافة المدرسة بنجاح")
+            return redirect(url_for("list_schools"))
+        else:
+            flash("⚠️ يرجى تعبئة جميع الحقول")
+
+    return render_template("add_school.html")
+
+@app.route("/schools/edit/<int:school_id>", methods=["GET", "POST"])
+@login_required
+def edit_school(school_id):
+    if session.get("role") != "superadmin":
+        flash("❌ غير مسموح")
+        return redirect(url_for("dashboard"))
+
+    conn = db.get_db_connection()
+    school = conn.execute("SELECT * FROM schools WHERE id = ?", (school_id,)).fetchone()
+
+    if not school:
+        flash("⚠️ المدرسة غير موجودة")
+        return redirect(url_for("list_schools"))
+
+    if request.method == "POST":
+        school_name = request.form.get("school_name")
+        admin_username = request.form.get("admin_username")
+        admin_password = request.form.get("admin_password")
+
+        conn.execute("""
+            UPDATE schools
+            SET school_name = ?, admin_username = ?, admin_password = ?
+            WHERE id = ?
+        """, (school_name, admin_username, admin_password, school_id))
+        conn.commit()
+        conn.close()
+        flash("✅ تم تعديل بيانات المدرسة")
+        return redirect(url_for("list_schools"))
+
+    conn.close()
+    return render_template("edit_school.html", school=school)
+
+@app.route("/schools/delete/<int:school_id>", methods=["POST"])
+@login_required
+def delete_school(school_id):
+    if session.get("role") != "superadmin":
+        flash("❌ غير مسموح")
+        return redirect(url_for("dashboard"))
+
+    conn = db.get_db_connection()
+    conn.execute("DELETE FROM schools WHERE id = ?", (school_id,))
+    conn.commit()
+    conn.close()
+    flash("🗑️ تم حذف المدرسة بنجاح")
+    return redirect(url_for("list_schools"))
+
 # --- إنشاء الجداول الافتراضية ---
 db.create_tables()
 db.seed_data()
