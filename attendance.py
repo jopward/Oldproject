@@ -7,21 +7,22 @@ from db import get_db_connection
 @login_required
 def dashboard():
     school_id = session.get("school_id")
-    if not school_id:
+    teacher_id = session.get("user", {}).get("id")  # ✅ نستخدم id المعلم من الجلسة
+    if not school_id or not teacher_id:
         return redirect(url_for("login"))
 
     conn = get_db_connection()
     today = date.today().isoformat()
 
-    # ✅ الطلاب من نفس المدرسة فقط
+    # ✅ الطلاب من نفس المدرسة فقط + الحضور مرتبط بالمعلم
     students = conn.execute('''
         SELECT s.id, s.student_name, s.class_name, s.section, a.status
         FROM students s
         LEFT JOIN attendance a
-        ON s.id = a.student_id AND a.date = ? AND a.school_id=?
+        ON s.id = a.student_id AND a.date = ? AND a.school_id=? AND a.teacher_id=?
         WHERE s.school_id=?
         ORDER BY s.student_name
-    ''', (today, school_id, school_id)).fetchall()
+    ''', (today, school_id, teacher_id, school_id)).fetchall()
 
     # ✅ الصفوف والشعب ضمن نفس المدرسة فقط
     classes = sorted(set([row["class_name"] for row in students if row["class_name"]]))
@@ -40,8 +41,9 @@ def dashboard():
 @login_required
 def update_attendance():
     school_id = session.get("school_id")
-    if not school_id:
-        return jsonify({'success': False, 'message': 'مدرسة غير معروفة'})
+    teacher_id = session.get("user", {}).get("id")  # ✅ المعلم الحالي
+    if not school_id or not teacher_id:
+        return jsonify({'success': False, 'message': 'مدرسة أو معلم غير معروف'})
 
     data = request.get_json()
     student_id = data['student_id']
@@ -50,19 +52,19 @@ def update_attendance():
 
     conn = get_db_connection()
     existing = conn.execute(
-        'SELECT * FROM attendance WHERE student_id=? AND date=? AND school_id=?',
-        (student_id, today, school_id)
+        'SELECT * FROM attendance WHERE student_id=? AND date=? AND school_id=? AND teacher_id=?',
+        (student_id, today, school_id, teacher_id)
     ).fetchone()
 
     if existing:
         conn.execute(
-            'UPDATE attendance SET status=? WHERE student_id=? AND date=? AND school_id=?',
-            (status, student_id, today, school_id)
+            'UPDATE attendance SET status=? WHERE student_id=? AND date=? AND school_id=? AND teacher_id=?',
+            (status, student_id, today, school_id, teacher_id)
         )
     else:
         conn.execute(
-            'INSERT INTO attendance (student_id, date, status, school_id) VALUES (?, ?, ?, ?)',
-            (student_id, today, status, school_id)
+            'INSERT INTO attendance (student_id, date, status, school_id, teacher_id) VALUES (?, ?, ?, ?, ?)',
+            (student_id, today, status, school_id, teacher_id)
         )
 
     conn.commit()

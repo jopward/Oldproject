@@ -13,17 +13,26 @@ def tracking_page():
     conn = get_db_connection()
     today = date.today().isoformat()
 
-    # ✅ طلاب المدرسة فقط
+    # ✅ الطلاب من نفس المدرسة فقط
     students = conn.execute(
         "SELECT * FROM students WHERE school_id=? ORDER BY student_name",
         (school_id,)
     ).fetchall()
 
-    # ✅ بيانات التتبع لليوم الحالي للمدرسة فقط
-    rows = conn.execute(
-        "SELECT * FROM student_tracking WHERE date=? AND school_id=?",
-        (today, school_id)
-    ).fetchall()
+    # ✅ بيانات التتبع لليوم الحالي حسب المعلم أو لجميع المعلمين إذا كان المدير
+    if session.get("role") == "teacher":
+        teacher_id = session['user']['id']
+        rows = conn.execute(
+            "SELECT * FROM student_tracking WHERE date=? AND school_id=? AND teacher_id=?",
+            (today, school_id, teacher_id)
+        ).fetchall()
+    else:
+        # المدير يرى كل البيانات
+        rows = conn.execute(
+            "SELECT * FROM student_tracking WHERE date=? AND school_id=?",
+            (today, school_id)
+        ).fetchall()
+
     records = {r['student_id']: r for r in rows}
 
     # ✅ الصفوف والشعب لنفس المدرسة فقط
@@ -47,6 +56,7 @@ def tracking_page():
         sections=sections
     )
 
+
 @login_required
 def update_tracking():
     school_id = session.get("school_id")
@@ -59,26 +69,33 @@ def update_tracking():
     value = data.get("value")
     today = date.today().isoformat()
 
+    teacher_id = session['user']['id'] if session.get("role") == "teacher" else None
+
     conn = get_db_connection()
     existing = conn.execute(
-        "SELECT id FROM student_tracking WHERE student_id=? AND date=? AND school_id=?",
-        (student_id, today, school_id)
+        "SELECT id FROM student_tracking WHERE student_id=? AND date=? AND school_id=?"
+        + (" AND teacher_id=?" if teacher_id else ""),
+        (student_id, today, school_id) + ((teacher_id,) if teacher_id else ())
     ).fetchone()
 
     if existing:
         conn.execute(
-            f"UPDATE student_tracking SET {field}=? WHERE student_id=? AND date=? AND school_id=?",
-            (value, student_id, today, school_id)
+            f"UPDATE student_tracking SET {field}=? WHERE student_id=? AND date=? AND school_id=?"
+            + (" AND teacher_id=?" if teacher_id else ""),
+            (value, student_id, today, school_id) + ((teacher_id,) if teacher_id else ())
         )
     else:
         conn.execute(
-            f"INSERT INTO student_tracking (student_id, date, {field}, school_id) VALUES (?, ?, ?, ?)",
-            (student_id, today, value, school_id)
+            f"INSERT INTO student_tracking (student_id, date, {field}, school_id"
+            + (", teacher_id" if teacher_id else "") + ") VALUES (?, ?, ?, ?"
+            + (", ?" if teacher_id else "") + ")",
+            (student_id, today, value, school_id) + ((teacher_id,) if teacher_id else ())
         )
 
     conn.commit()
     conn.close()
     return jsonify({"status": "success"})
+
 
 @login_required
 def update_note():
@@ -91,21 +108,27 @@ def update_note():
     note = data.get("note")
     today = date.today().isoformat()
 
+    teacher_id = session['user']['id'] if session.get("role") == "teacher" else None
+
     conn = get_db_connection()
     existing = conn.execute(
-        "SELECT id FROM student_tracking WHERE student_id=? AND date=? AND school_id=?",
-        (student_id, today, school_id)
+        "SELECT id FROM student_tracking WHERE student_id=? AND date=? AND school_id=?"
+        + (" AND teacher_id=?" if teacher_id else ""),
+        (student_id, today, school_id) + ((teacher_id,) if teacher_id else ())
     ).fetchone()
 
     if existing:
         conn.execute(
-            "UPDATE student_tracking SET note=? WHERE student_id=? AND date=? AND school_id=?",
-            (note, student_id, today, school_id)
+            "UPDATE student_tracking SET note=? WHERE student_id=? AND date=? AND school_id=?"
+            + (" AND teacher_id=?" if teacher_id else ""),
+            (note, student_id, today, school_id) + ((teacher_id,) if teacher_id else ())
         )
     else:
         conn.execute(
-            "INSERT INTO student_tracking (student_id, date, note, school_id) VALUES (?, ?, ?, ?)",
-            (student_id, today, note, school_id)
+            "INSERT INTO student_tracking (student_id, date, note, school_id"
+            + (", teacher_id" if teacher_id else "") + ") VALUES (?, ?, ?, ?"
+            + (", ?" if teacher_id else "") + ")",
+            (student_id, today, note, school_id) + ((teacher_id,) if teacher_id else ())
         )
 
     conn.commit()
