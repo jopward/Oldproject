@@ -1,3 +1,4 @@
+# auth.py
 from functools import wraps
 from flask import session, redirect, url_for, flash, render_template, request
 from db import get_db_connection
@@ -14,26 +15,27 @@ def login_required(f):
 def login_view():
     """
     تسجيل الدخول لجميع المستخدمين:
-    - superadmin (كلمة مرور بدون تشفير)
-    - admin (مدراء المدارس بدون تشفير)
-    - teacher (المعلمين مع التشفير)
+    - superadmin (users table, role=superadmin)
+    - admin (schools table)
+    - teacher (teachers table)
+    ✅ كلهم بكلمة مرور مشفّرة
     """
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '').strip()
         conn = get_db_connection()
 
-        # ✅ تحقق من superadmin
+        # ✅ تحقق من superadmin في جدول users
         superadmin = conn.execute(
-            "SELECT * FROM users WHERE username = ?", (username,)
+            "SELECT * FROM users WHERE username = ? AND role = 'superadmin'", (username,)
         ).fetchone()
-        if superadmin and superadmin['password'] == password:
+        if superadmin and check_password_hash(superadmin['password'], password):
             session['user'] = {'id': superadmin['id'], 'name': username}
             session['role'] = 'superadmin'
             conn.close()
             return redirect(url_for('dashboard'))
 
-        # ✅ تحقق من المدرسين
+        # ✅ تحقق من المدرسين (teachers)
         teacher = conn.execute(
             "SELECT * FROM teachers WHERE username = ?", (username,)
         ).fetchone()
@@ -44,11 +46,11 @@ def login_view():
             conn.close()
             return redirect(url_for('dashboard'))
 
-        # ✅ تحقق من المدراء (بدون تشفير)
+        # ✅ تحقق من المدراء (admins) في جدول schools
         school = conn.execute(
             "SELECT * FROM schools WHERE admin_username = ?", (username,)
         ).fetchone()
-        if school and school['admin_password'] == password:
+        if school and check_password_hash(school['admin_password'], password):
             session['user'] = {'id': school['id'], 'name': username}
             session['school_id'] = school['id']
             session['role'] = 'admin'
@@ -56,7 +58,7 @@ def login_view():
             return redirect(url_for('dashboard'))
 
         conn.close()
-        flash('اسم المستخدم أو كلمة المرور خاطئة')
+        flash('اسم المستخدم أو كلمة المرور خاطئة', 'danger')
         return redirect(url_for('login'))
 
     # GET
