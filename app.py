@@ -23,10 +23,30 @@ app.add_url_rule('/logout', 'logout', logout_view)
 app.add_url_rule('/', 'dashboard', attendance.dashboard)
 app.add_url_rule('/update_attendance', 'update_attendance', attendance.update_attendance, methods=['POST'])
 
-# students
-app.add_url_rule('/students', 'students', students_module.students, methods=['GET', 'POST'])
-app.add_url_rule('/edit_student/<int:student_id>', 'edit_student', students_module.edit_student, methods=['POST'])
-app.add_url_rule('/delete_student/<int:student_id>', 'delete_student', students_module.delete_student, methods=['POST'])
+# students (خاص بالمدير فقط)
+@app.route('/students', methods=['GET', 'POST'])
+@login_required
+def students():
+    if session.get("role") != "admin":
+        flash("❌ غير مسموح، هذه الصفحة خاصة بالمدير فقط")
+        return redirect(url_for("dashboard"))
+    return students_module.students()
+
+@app.route('/edit_student/<int:student_id>', methods=['POST'])
+@login_required
+def edit_student(student_id):
+    if session.get("role") != "admin":
+        flash("❌ غير مسموح")
+        return redirect(url_for("dashboard"))
+    return students_module.edit_student(student_id)
+
+@app.route('/delete_student/<int:student_id>', methods=['POST'])
+@login_required
+def delete_student(student_id):
+    if session.get("role") != "admin":
+        flash("❌ غير مسموح")
+        return redirect(url_for("dashboard"))
+    return students_module.delete_student(student_id)
 
 # tracking
 app.add_url_rule('/tracking', 'tracking_page', tracking.tracking_page)
@@ -44,14 +64,14 @@ app.add_url_rule('/teachers', 'teachers_page', teachers.teachers_page, methods=[
 app.add_url_rule('/teachers/delete/<int:teacher_id>', 'delete_teacher', teachers.delete_teacher, methods=['POST'])
 app.add_url_rule('/teachers/add', 'add_teacher', teachers.add_teacher, methods=['POST'])
 
-# --- إدارة المواد (Subjects) ---
+# subjects
 app.add_url_rule('/subjects', 'subjects_page', subjects.subjects_page, methods=['GET'])
 app.add_url_rule('/subjects/add', 'add_subject', subjects.add_subject, methods=['POST'])
 app.add_url_rule('/subjects/edit/<int:subject_id>', 'edit_subject', subjects.edit_subject, methods=['GET', 'POST'])
 app.add_url_rule('/subjects/delete/<int:subject_id>', 'delete_subject', subjects.delete_subject, methods=['POST'])
 app.add_url_rule('/subjects/remove_teacher/<int:st_id>', 'remove_teacher_from_subject', subjects.remove_teacher_from_subject, methods=['POST'])
 
-# --- إضافة صفوف وشعب ---
+# --- إدارة الصفوف ---
 @app.route("/add_class", methods=["GET", "POST"])
 @login_required
 def add_class():
@@ -71,7 +91,6 @@ def add_class():
         teacher_ids = request.form.getlist("teacher_ids")
 
         if class_name and section and teacher_ids:
-            # ✅ إضافة school_id لكل صف
             cur = conn.execute(
                 "INSERT INTO teacher_classes (class_name, section, period, school_id) VALUES (?, ?, ?, ?)",
                 (class_name, section, period, session["school_id"])
@@ -195,7 +214,6 @@ def add_school():
         admin_password = request.form.get("admin_password")
 
         if school_name and admin_username and admin_password:
-            # ✅ تشفير كلمة مرور المدير
             hashed_pw = generate_password_hash(admin_password)
             conn = db.get_db_connection()
             conn.execute("""
@@ -232,7 +250,6 @@ def edit_school(school_id):
 
         if school_name and admin_username:
             if admin_password:
-                # ✅ إذا غيّر كلمة المرور → نخزنها مشفرة
                 hashed_pw = generate_password_hash(admin_password)
                 conn.execute("""
                     UPDATE schools
@@ -240,7 +257,6 @@ def edit_school(school_id):
                     WHERE id = ?
                 """, (school_name, admin_username, hashed_pw, school_id))
             else:
-                # ✅ إذا ما غير الباسورد → نخلي القديم زي ما هو
                 conn.execute("""
                     UPDATE schools
                     SET school_name = ?, admin_username = ?
