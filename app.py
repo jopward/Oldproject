@@ -70,9 +70,10 @@ def add_class():
         teacher_ids = request.form.getlist("teacher_ids")
 
         if class_name and section and teacher_ids:
+            # ✅ إضافة school_id لكل صف
             cur = conn.execute(
-                "INSERT INTO teacher_classes (class_name, section, period) VALUES (?, ?, ?)",
-                (class_name, section, period)
+                "INSERT INTO teacher_classes (class_name, section, period, school_id) VALUES (?, ?, ?, ?)",
+                (class_name, section, period, session["school_id"])
             )
             class_id = cur.lastrowid
             for t_id in teacher_ids:
@@ -100,7 +101,7 @@ def list_classes():
         FROM teacher_classes tc
         LEFT JOIN class_teachers ct ON tc.id = ct.class_id
         LEFT JOIN teachers t ON ct.teacher_id = t.id
-        WHERE t.school_id = ? OR t.id IS NULL
+        WHERE tc.school_id = ?
         GROUP BY tc.id
     """, (session["school_id"],)).fetchall()
     conn.close()
@@ -119,7 +120,7 @@ def edit_class(class_id):
     ).fetchall()
 
     class_row = conn.execute(
-        "SELECT * FROM teacher_classes WHERE id = ?", (class_id,)
+        "SELECT * FROM teacher_classes WHERE id = ? AND school_id = ?", (class_id, session["school_id"])
     ).fetchone()
 
     current_teachers = conn.execute(

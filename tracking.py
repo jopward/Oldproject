@@ -1,23 +1,40 @@
 # tracking.py
-from flask import render_template, request, jsonify
+from flask import render_template, request, jsonify, session, redirect, url_for
 from datetime import date
 from db import get_db_connection
 from auth import login_required
 
+@login_required
 def tracking_page():
+    school_id = session.get("school_id")
+    if not school_id:
+        return redirect(url_for("dashboard"))
+
     conn = get_db_connection()
     today = date.today().isoformat()
 
-    # جميع الطلاب
-    students = conn.execute("SELECT * FROM students ORDER BY student_name").fetchall()
+    # ✅ طلاب المدرسة فقط
+    students = conn.execute(
+        "SELECT * FROM students WHERE school_id=? ORDER BY student_name",
+        (school_id,)
+    ).fetchall()
 
-    # بيانات التتبع لليوم الحالي
-    rows = conn.execute("SELECT * FROM student_tracking WHERE date=?", (today,)).fetchall()
+    # ✅ بيانات التتبع لليوم الحالي للمدرسة فقط
+    rows = conn.execute(
+        "SELECT * FROM student_tracking WHERE date=? AND school_id=?",
+        (today, school_id)
+    ).fetchall()
     records = {r['student_id']: r for r in rows}
 
-    # ✅ الصفوف والشعب المميزة
-    classes = [row['class_name'] for row in conn.execute("SELECT DISTINCT class_name FROM students").fetchall()]
-    sections = [row['section'] for row in conn.execute("SELECT DISTINCT section FROM students").fetchall()]
+    # ✅ الصفوف والشعب لنفس المدرسة فقط
+    classes = [row['class_name'] for row in conn.execute(
+        "SELECT DISTINCT class_name FROM students WHERE school_id=?",
+        (school_id,)
+    ).fetchall()]
+    sections = [row['section'] for row in conn.execute(
+        "SELECT DISTINCT section FROM students WHERE school_id=?",
+        (school_id,)
+    ).fetchall()]
 
     conn.close()
 
@@ -30,7 +47,12 @@ def tracking_page():
         sections=sections
     )
 
+@login_required
 def update_tracking():
+    school_id = session.get("school_id")
+    if not school_id:
+        return jsonify({"status": "error", "message": "مدرسة غير معروفة"})
+
     data = request.get_json()
     student_id = data.get("student_id")
     field = data.get("field")
@@ -39,26 +61,31 @@ def update_tracking():
 
     conn = get_db_connection()
     existing = conn.execute(
-        "SELECT id FROM student_tracking WHERE student_id=? AND date=?",
-        (student_id, today)
+        "SELECT id FROM student_tracking WHERE student_id=? AND date=? AND school_id=?",
+        (student_id, today, school_id)
     ).fetchone()
 
     if existing:
         conn.execute(
-            f"UPDATE student_tracking SET {field}=? WHERE student_id=? AND date=?",
-            (value, student_id, today)
+            f"UPDATE student_tracking SET {field}=? WHERE student_id=? AND date=? AND school_id=?",
+            (value, student_id, today, school_id)
         )
     else:
         conn.execute(
-            f"INSERT INTO student_tracking (student_id, date, {field}) VALUES (?, ?, ?)",
-            (student_id, today, value)
+            f"INSERT INTO student_tracking (student_id, date, {field}, school_id) VALUES (?, ?, ?, ?)",
+            (student_id, today, value, school_id)
         )
 
     conn.commit()
     conn.close()
     return jsonify({"status": "success"})
 
+@login_required
 def update_note():
+    school_id = session.get("school_id")
+    if not school_id:
+        return jsonify({"status": "error", "message": "مدرسة غير معروفة"})
+
     data = request.get_json()
     student_id = data.get("student_id")
     note = data.get("note")
@@ -66,19 +93,19 @@ def update_note():
 
     conn = get_db_connection()
     existing = conn.execute(
-        "SELECT id FROM student_tracking WHERE student_id=? AND date=?",
-        (student_id, today)
+        "SELECT id FROM student_tracking WHERE student_id=? AND date=? AND school_id=?",
+        (student_id, today, school_id)
     ).fetchone()
 
     if existing:
         conn.execute(
-            "UPDATE student_tracking SET note=? WHERE student_id=? AND date=?",
-            (note, student_id, today)
+            "UPDATE student_tracking SET note=? WHERE student_id=? AND date=? AND school_id=?",
+            (note, student_id, today, school_id)
         )
     else:
         conn.execute(
-            "INSERT INTO student_tracking (student_id, date, note) VALUES (?, ?, ?)",
-            (student_id, today, note)
+            "INSERT INTO student_tracking (student_id, date, note, school_id) VALUES (?, ?, ?, ?)",
+            (student_id, today, note, school_id)
         )
 
     conn.commit()

@@ -15,8 +15,8 @@ def login_view():
     """
     تسجيل الدخول لجميع المستخدمين:
     - superadmin (كلمة مرور بدون تشفير)
-    - admin (مدراء المدارس)
-    - teacher (المعلمين)
+    - admin (مدراء المدارس بدون تشفير)
+    - teacher (المعلمين مع التشفير)
     """
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
@@ -44,11 +44,11 @@ def login_view():
             conn.close()
             return redirect(url_for('dashboard'))
 
-        # ✅ تحقق من المدراء
+        # ✅ تحقق من المدراء (بدون تشفير)
         school = conn.execute(
             "SELECT * FROM schools WHERE admin_username = ?", (username,)
         ).fetchone()
-        if school and check_password_hash(school['admin_password'], password):
+        if school and school['admin_password'] == password:
             session['user'] = {'id': school['id'], 'name': username}
             session['school_id'] = school['id']
             session['role'] = 'admin'
@@ -59,6 +59,7 @@ def login_view():
         flash('اسم المستخدم أو كلمة المرور خاطئة')
         return redirect(url_for('login'))
 
+    # GET
     return render_template('login.html')
 
 def logout_view():
