@@ -7,6 +7,7 @@ import reports as reports_module
 import db  # ✅ استدعاء db.py
 import teachers  # ملف teachers.py
 import subjects  # ملف subjects.py
+from werkzeug.security import generate_password_hash  # ✅ إضافة التشفير
 
 # --- تعريف التطبيق ---
 app = Flask(__name__)
@@ -194,11 +195,13 @@ def add_school():
         admin_password = request.form.get("admin_password")
 
         if school_name and admin_username and admin_password:
+            # ✅ تشفير كلمة مرور المدير
+            hashed_pw = generate_password_hash(admin_password)
             conn = db.get_db_connection()
             conn.execute("""
                 INSERT INTO schools (school_name, admin_username, admin_password)
                 VALUES (?, ?, ?)
-            """, (school_name, admin_username, admin_password))
+            """, (school_name, admin_username, hashed_pw))
             conn.commit()
             conn.close()
             flash("✅ تم إضافة المدرسة بنجاح")
@@ -227,15 +230,29 @@ def edit_school(school_id):
         admin_username = request.form.get("admin_username")
         admin_password = request.form.get("admin_password")
 
-        conn.execute("""
-            UPDATE schools
-            SET school_name = ?, admin_username = ?, admin_password = ?
-            WHERE id = ?
-        """, (school_name, admin_username, admin_password, school_id))
-        conn.commit()
-        conn.close()
-        flash("✅ تم تعديل بيانات المدرسة")
-        return redirect(url_for("list_schools"))
+        if school_name and admin_username:
+            if admin_password:
+                # ✅ إذا غيّر كلمة المرور → نخزنها مشفرة
+                hashed_pw = generate_password_hash(admin_password)
+                conn.execute("""
+                    UPDATE schools
+                    SET school_name = ?, admin_username = ?, admin_password = ?
+                    WHERE id = ?
+                """, (school_name, admin_username, hashed_pw, school_id))
+            else:
+                # ✅ إذا ما غير الباسورد → نخلي القديم زي ما هو
+                conn.execute("""
+                    UPDATE schools
+                    SET school_name = ?, admin_username = ?
+                    WHERE id = ?
+                """, (school_name, admin_username, school_id))
+
+            conn.commit()
+            conn.close()
+            flash("✅ تم تعديل بيانات المدرسة")
+            return redirect(url_for("list_schools"))
+        else:
+            flash("⚠️ يرجى تعبئة جميع الحقول")
 
     conn.close()
     return render_template("edit_school.html", school=school)
