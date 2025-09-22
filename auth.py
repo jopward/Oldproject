@@ -15,9 +15,9 @@ def login_required(f):
 def login_view():
     """
     تسجيل الدخول لجميع المستخدمين:
-    - superadmin (users table, role=superadmin)
-    - admin (schools table)
-    - teacher (teachers table)
+    - superadmin (جدول users, role=superadmin)
+    - admin (جدول schools)
+    - teacher (جدول teachers)
     ✅ كلهم بكلمة مرور مشفّرة
     """
     if request.method == 'POST':
@@ -25,7 +25,7 @@ def login_view():
         password = request.form.get('password', '').strip()
         conn = get_db_connection()
 
-        # ✅ تحقق من superadmin في جدول users
+        # --- تحقق من السوبر أدمن في جدول users ---
         superadmin = conn.execute(
             "SELECT * FROM users WHERE username = ? AND role = 'superadmin'", (username,)
         ).fetchone()
@@ -35,7 +35,7 @@ def login_view():
             conn.close()
             return redirect(url_for('dashboard'))
 
-        # ✅ تحقق من المدرسين (teachers)
+        # --- تحقق من المعلمين ---
         teacher = conn.execute(
             "SELECT * FROM teachers WHERE username = ?", (username,)
         ).fetchone()
@@ -46,7 +46,7 @@ def login_view():
             conn.close()
             return redirect(url_for('dashboard'))
 
-        # ✅ تحقق من المدراء (admins) في جدول schools
+        # --- تحقق من مدراء المدارس ---
         school = conn.execute(
             "SELECT * FROM schools WHERE admin_username = ?", (username,)
         ).fetchone()

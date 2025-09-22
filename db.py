@@ -59,7 +59,6 @@ def create_tables():
     """)
 
     # --- ✅ الجداول الجديدة للمواد ---
-    # جدول المواد
     cur.execute("""
     CREATE TABLE IF NOT EXISTS subjects (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -67,7 +66,6 @@ def create_tables():
     )
     """)
 
-    # جدول ربط المعلمين بالمواد
     cur.execute("""
     CREATE TABLE IF NOT EXISTS teacher_subjects (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -79,7 +77,6 @@ def create_tables():
     )
     """)
 
-    # جدول ربط المواد بالصفوف والمعلمين
     cur.execute("""
     CREATE TABLE IF NOT EXISTS class_subjects (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -89,7 +86,7 @@ def create_tables():
         FOREIGN KEY (class_id) REFERENCES teacher_classes(id) ON DELETE CASCADE,
         FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE,
         FOREIGN KEY (teacher_id) REFERENCES teachers(id) ON DELETE CASCADE,
-        UNIQUE (class_id, subject_id, teacher_id)
+        UNIQUE(class_id, subject_id, teacher_id)
     )
     """)
 
@@ -114,31 +111,51 @@ def create_tables():
     if 'school_id' not in columns:
         cur.execute("ALTER TABLE students ADD COLUMN school_id INTEGER REFERENCES schools(id)")
 
+    # --- ✅ إنشاء جدول السوبر أدمن (users) ---
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT NOT NULL UNIQUE,
+        password TEXT NOT NULL,
+        role TEXT NOT NULL
+    )
+    """)
+
     conn.commit()
     conn.close()
 
+# --- ✅ إضافة سوبر أدمن ---
+def create_superadmin(username="superadmin", password="12345"):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    hashed_pw = generate_password_hash(password)
 
-# --- ✅ إضافة بيانات وهمية (Seed) ---
+    exists = cur.execute("SELECT * FROM users WHERE username = ? AND role = 'superadmin'", (username,)).fetchone()
+    if exists:
+        cur.execute("UPDATE users SET password = ? WHERE id = ?", (hashed_pw, exists['id']))
+        print(f"✅ تم تحديث كلمة مرور السوبر أدمن '{username}'")
+    else:
+        cur.execute("INSERT INTO users (username, password, role) VALUES (?, ?, 'superadmin')", (username, hashed_pw))
+        print(f"✅ تم إنشاء السوبر أدمن '{username}' بكلمة مرور جديدة")
+
+    conn.commit()
+    conn.close()
+
+# --- ✅ بقية الداتا الوهمية والمدارس والمعلمين كما هي ---
 def seed_data():
     conn = get_db_connection()
     cur = conn.cursor()
-
     # مدارس وهمية
     schools = [
         {"school_name": "مدرسة النور", "admin_username": "admin_nour", "admin_password": generate_password_hash("1234")},
         {"school_name": "مدرسة الأمل", "admin_username": "admin_amal", "admin_password": generate_password_hash("1234")}
     ]
     for s in schools:
-        cur.execute("""
-        INSERT OR IGNORE INTO schools (school_name, admin_username, admin_password)
-        VALUES (?, ?, ?)
-        """, (s['school_name'], s['admin_username'], s['admin_password']))
-
-    # جلب المدارس
+        cur.execute("INSERT OR IGNORE INTO schools (school_name, admin_username, admin_password) VALUES (?, ?, ?)",
+                    (s['school_name'], s['admin_username'], s['admin_password']))
     cur.execute("SELECT * FROM schools")
     school_rows = cur.fetchall()
 
-    # معلمين وهميين
     teachers = [
         {"teacher_name": "أحمد", "username": "ahmed", "password": generate_password_hash("123"), "school_id": school_rows[0]['id']},
         {"teacher_name": "سعاد", "username": "suad", "password": generate_password_hash("123"), "school_id": school_rows[0]['id']},
@@ -146,107 +163,33 @@ def seed_data():
         {"teacher_name": "منى", "username": "mona", "password": generate_password_hash("123"), "school_id": school_rows[1]['id']}
     ]
     for t in teachers:
-        cur.execute("""
-        INSERT OR IGNORE INTO teachers (teacher_name, username, password, school_id)
-        VALUES (?, ?, ?, ?)
-        """, (t['teacher_name'], t['username'], t['password'], t['school_id']))
-
-    # إضافة صفوف
-    classes = [
-        {"class_name": "الصف السابع", "section": "أ", "period": "صباحي"},
-        {"class_name": "الصف الثامن", "section": "ب", "period": "صباحي"},
-        {"class_name": "الصف السابع", "section": "ب", "period": "صباحي"},
-        {"class_name": "الصف التاسع", "section": "أ", "period": "صباحي"},
-        {"class_name": "الصف التاسع", "section": "ب", "period": "صباحي"}
-    ]
-    for c in classes:
-        cur.execute("""
-        INSERT OR IGNORE INTO teacher_classes (class_name, section, period)
-        VALUES (?, ?, ?)
-        """, (c['class_name'], c['section'], c['period']))
-
-    # ربط الصفوف بالمعلمين في جدول class_teachers
-    cur.execute("SELECT * FROM teacher_classes")
-    class_rows = cur.fetchall()
-    cur.execute("SELECT * FROM teachers")
-    teacher_rows = cur.fetchall()
-
-    class_teacher_links = [
-        {"class_id": class_rows[0]['id'], "teacher_id": teacher_rows[0]['id']},
-        {"class_id": class_rows[1]['id'], "teacher_id": teacher_rows[0]['id']},
-        {"class_id": class_rows[2]['id'], "teacher_id": teacher_rows[1]['id']},
-        {"class_id": class_rows[3]['id'], "teacher_id": teacher_rows[2]['id']},
-        {"class_id": class_rows[4]['id'], "teacher_id": teacher_rows[3]['id']}
-    ]
-    for link in class_teacher_links:
-        cur.execute("""
-        INSERT OR IGNORE INTO class_teachers (class_id, teacher_id)
-        VALUES (?, ?)
-        """, (link['class_id'], link['teacher_id']))
-
-    # --- ✅ إضافة مواد وهمية ---
-    subjects = ["لغة عربية", "لغة إنجليزية", "رياضيات", "مهارات رقمية"]
-    for subj in subjects:
-        cur.execute("INSERT OR IGNORE INTO subjects (subject_name) VALUES (?)", (subj,))
-
-    # جلب المواد والمعلمين
-    cur.execute("SELECT * FROM subjects")
-    subject_rows = cur.fetchall()
-
-    # ربط معلمين بموادهم
-    teacher_subjects_links = [
-        {"teacher_id": teacher_rows[0]['id'], "subject_id": subject_rows[2]['id']},  # أحمد -> رياضيات
-        {"teacher_id": teacher_rows[1]['id'], "subject_id": subject_rows[0]['id']},  # سعاد -> لغة عربية
-        {"teacher_id": teacher_rows[2]['id'], "subject_id": subject_rows[1]['id']},  # محمود -> لغة إنجليزية
-        {"teacher_id": teacher_rows[3]['id'], "subject_id": subject_rows[3]['id']}   # منى -> مهارات رقمية
-    ]
-    for link in teacher_subjects_links:
-        cur.execute("""
-        INSERT OR IGNORE INTO teacher_subjects (teacher_id, subject_id)
-        VALUES (?, ?)
-        """, (link['teacher_id'], link['subject_id']))
+        cur.execute("INSERT OR IGNORE INTO teachers (teacher_name, username, password, school_id) VALUES (?, ?, ?, ?)",
+                    (t['teacher_name'], t['username'], t['password'], t['school_id']))
 
     conn.commit()
     conn.close()
     print("✅ تم إنشاء الجداول وإضافة بيانات وهمية بنجاح")
 
-
-# --- ✅ إضافة مدرسة جديدة مع المعلمين ---
+# --- ✅ إضافة مدرسة جديدة ---
 def add_school(school_name, admin_username, admin_password, teachers_list=None):
     conn = get_db_connection()
     cur = conn.cursor()
-
     hashed_admin_pw = generate_password_hash(admin_password)
-    cur.execute("""
-        INSERT INTO schools (school_name, admin_username, admin_password)
-        VALUES (?, ?, ?)
-    """, (school_name, admin_username, hashed_admin_pw))
+    cur.execute("INSERT INTO schools (school_name, admin_username, admin_password) VALUES (?, ?, ?)",
+                (school_name, admin_username, hashed_admin_pw))
     school_id = cur.lastrowid
 
     if teachers_list:
         for t in teachers_list:
             hashed_pw = generate_password_hash(t['password'])
-            cur.execute("""
-                INSERT INTO teachers (teacher_name, username, password, school_id)
-                VALUES (?, ?, ?, ?)
-            """, (t['teacher_name'], t['username'], hashed_pw, school_id))
-
+            cur.execute("INSERT INTO teachers (teacher_name, username, password, school_id) VALUES (?, ?, ?, ?)",
+                        (t['teacher_name'], t['username'], hashed_pw, school_id))
     conn.commit()
     conn.close()
     print(f"✅ تم إضافة المدرسة '{school_name}' بنجاح")
-
 
 # --- التنفيذ عند تشغيل الملف مباشرة ---
 if __name__ == "__main__":
     create_tables()
     seed_data()
-
-    add_school(
-        "مدرسة الربيع",
-        "admin_rabea",
-        "1234",
-        teachers_list=[
-            {"teacher_name": "ليلى", "username": "leila", "password": "123"},
-            {"teacher_name": "علي", "username": "ali", "password": "123"}
-        ]
-    )
+    create_superadmin()  # إنشاء أو تحديث السوبر أدمن

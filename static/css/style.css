@@ -57,6 +57,22 @@ td button {
     margin: 0 2px;
 }
 
+/* ترقيم تلقائي للصفوف */
+.table-counter {
+  counter-reset: rowNumber;
+}
+
+.table-counter tbody tr {
+  counter-increment: rowNumber;
+}
+
+.table-counter tbody tr td:first-child::before {
+  content: counter(rowNumber);
+  min-width: 2em;
+  display: inline-block;
+  text-align: center;
+  font-weight: bold;
+}
 /* ===== الأزرار ===== */
 .btn-success { background-color: #28a745; border: none; }
 .btn-warning { background-color: #ffc107; border: none; color: #212529; }

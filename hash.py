@@ -1,20 +1,38 @@
-# update_superadmin_password.py
+# set_superadmin.py
 import sqlite3
-from auth import hash_password  # استدعاء دالة تشفير كلمات السر من auth.py
+from werkzeug.security import generate_password_hash
 
-# ضع هنا كلمة السر الجديدة
-new_password = "12345"
+DB_NAME = "attendance.db"
+USERNAME = "superadmin"   # اسم المستخدم اللي عندك
+NEW_PASSWORD = "1234"     # غيّر هنا لكلمة المرور اللي تريدها
 
-# تشفير كلمة السر بالطريقة نفسها المستخدمة في المشروع
-hashed_password = hash_password(new_password)
+def main():
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
 
-# الاتصال بقاعدة البيانات
-conn = sqlite3.connect('attendance.db')
-cur = conn.cursor()
+    hashed = generate_password_hash(NEW_PASSWORD)
 
-# تحديث كلمة السر للـ superadmin
-cur.execute("UPDATE users SET password=? WHERE username='superadmin'", (hashed_password,))
-conn.commit()
-conn.close()
+    # تأكد إذا فيه جدول users
+    cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
+    if not cur.fetchone():
+        print("خطأ: ما في جدول users. تفقد هيكل DB أو اختر الخيار B لتعديل auth.py")
+        conn.close()
+        return
 
-print("✅ تم تحديث كلمة سر superadmin بنجاح")
+    # إذا موجود سجل للسوبر أدمن في users حدّثه، وإلا أدخله
+    cur.execute("SELECT * FROM users WHERE username = ?", (USERNAME,))
+    if cur.fetchone():
+        cur.execute("UPDATE users SET password = ?, role = 'superadmin' WHERE username = ?", (hashed, USERNAME))
+        print("✅ تم تحديث كلمة مرور السوبر أدمن في جدول users")
+    else:
+        # حاول الحصول على id فريد — id هو autoincrement عادةً
+        cur.execute("INSERT INTO users (username, password, role) VALUES (?, ?, ?)", (USERNAME, hashed, 'superadmin'))
+        print("✅ تم إضافة السوبر أدمن إلى جدول users")
+
+    conn.commit()
+    conn.close()
+    print("أعد تشغيل السيرفر (مثلاً: python app.py) وجرب تسجيل الدخول")
+
+if __name__ == "__main__":
+    main()

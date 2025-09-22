@@ -1,0 +1,49 @@
+/* ================== ترتيب التاريخ والصف والشعبة ================== */
+.header-row .d-flex {
+    flex-direction: column; /* التاريخ عمودياً فوق */
+    align-items: stretch; /* الحاوية تمتد بعرض كامل */
+}
+
+/* التاريخ على اليمين وبولد */
+.header-row #today {
+    text-align: right; /* التاريخ على اليمين */
+    margin-bottom: 0.1rem; /* تقليل المسافة بين التاريخ والصف/الشعبة */
+    font-weight: bold; /* جعل النص بولد */
+}
+
+/* جعل الصف والشعبة في نفس السطر تحت التاريخ */
+.header-row > .d-flex > div {
+    display: flex;
+    flex-direction: row; /* جميع العناصر داخل div في سطر واحد */
+    align-items: center; /* محاذاة رأسية وسط */
+    gap: 0.5rem; /* مسافة بين العناصر */
+}
+
+/* تنسيق الصناديق والعلامات */
+.header-row select,
+.header-row label {
+    display: inline-block;
+    font-size: 0.875rem; /* تصغير حجم النص إذا رغبت */
+    margin: 0; /* إزالة الهوامش الزائدة */
+}
+
+/* إزالة السهم الافتراضي من الصناديق */
+.header-row select {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-image: none;
+    padding-right: 0.5rem;
+}
+
+/* ================== ضبط حجم صناديق الصف والشعبة ================== */
+.header-row select.form-select {
+    width: auto; /* يتناسب مع النص فقط */
+    min-width: 5rem; /* عرض أدنى */
+    padding: 0.25rem 0.5rem; /* تصغير الحشوة لتناسب الحجم */
+}
+
+/* تقليل المسافة بين سطر الصف/الشعبة ورأس الجدول */
+#attendanceTable {
+    margin-top: 0.2rem; /* مسافة صغيرة جداً لجعلها ملتصقة */
+}

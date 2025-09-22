@@ -1,6 +1,54 @@
 {% include 'partials/header.html' %}
 {% include 'partials/navbar.html' %}
 
+<style>
+/* ===== تحسين عرض جدول التقرير / صفحة الطالب ===== */
+.table-responsive {
+    overflow-x: auto;  /* تمرير أفقي إذا كان الجدول أعرض من الحاوية */
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    padding: 5px;
+}
+
+/* اجعل الجدول كبير بما فيه الكفاية لعرض كل الأعمدة */
+#reportsTable {
+    min-width: 1000px; /* يمكن زيادة العرض حسب عدد الأعمدة */
+    table-layout: auto; /* الصف يتسع تلقائياً حسب النص */
+}
+
+/* ارتفاع الصف حسب محتواه */
+#reportsTable tbody tr {
+    height: auto; /* الارتفاع يتغير حسب محتوى النص */
+}
+
+/* تمييز الصفوف عند المرور بالماوس */
+#reportsTable tbody tr:hover {
+    background-color: #f1f1f1;
+}
+
+/* العمود الأول ثابت عند التمرير */
+#reportsTable th:first-child,
+#reportsTable td:first-child {
+    position: sticky;
+    left: 0;
+    background-color: #fff;
+    z-index: 2;
+}
+
+/* تحسين رؤوس الجدول: ثابتة عند التمرير */
+#reportsTable thead th {
+    background-color: #f8f9fa;
+    position: sticky;
+    top: 0;
+    z-index: 4;
+}
+
+/* input الملاحظات */
+.note-input.has-note {
+    border: 2px solid #28a745;
+}
+</style>
+
 <div class="container my-4">
 
     <!-- رأس الصفحة مع زر رجوع وإغلاق -->
