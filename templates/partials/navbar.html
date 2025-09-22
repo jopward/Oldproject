@@ -10,9 +10,14 @@
                 <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('dashboard') }}">لوحة الحضور</a>
                 </li>
+                
+                {# رابط الطلاب للمدير فقط #}
+                {% if session.get('role') == 'admin' %}
                 <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('students') }}">الطلاب</a>
                 </li>
+                {% endif %}
+
                 <li class="nav-item">
                     <a class="nav-link" href="{{ url_for('tracking_page') }}">المتابعة اليومية</a>
                 </li>
