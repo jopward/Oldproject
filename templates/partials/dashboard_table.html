@@ -1,6 +1,4 @@
-
-
-<div class="container mt-4">
+<div class="container mt-4 header-row">
     <div class="d-flex justify-content-between mb-3 align-items-center">
         <div id="today">
             {{ today }}
@@ -28,6 +26,7 @@
     <table class="table table-bordered text-center" id="attendanceTable">
         <thead class="table-light sticky-top">
             <tr>
+                <th style="width:40px">#</th> <!-- عمود الترقيم -->
                 <th>اسم الطالب</th>
                 <th>حاضر</th>
                 <th>متأخر</th>
@@ -37,6 +36,7 @@
         <tbody>
             {% for student in students|sort(attribute='student_name') %}
             <tr data-class="{{ student.class_name }}" data-section="{{ student.section }}">
+                <td class="row-number"></td> <!-- خلية الترقيم -->
                 <td>{{ student.student_name }}</td>
                 <td>
                     <input type="checkbox" class="attendance-checkbox" 
@@ -62,43 +62,4 @@
     </table>
 </div>
 
-<script>
-document.addEventListener("DOMContentLoaded", () => {
-    const table = document.getElementById("attendanceTable");
-    const classSelect = document.getElementById("classSelect");
-    const sectionSelect = document.getElementById("sectionSelect");
-
-    function filterTable() {
-        const selectedClass = classSelect.value;
-        const selectedSection = sectionSelect.value;
-
-        table.querySelectorAll("tbody tr").forEach(row => {
-            let show = true;
-            if(selectedClass && row.dataset.class !== selectedClass) show = false;
-            if(selectedSection && row.dataset.section !== selectedSection) show = false;
-            row.style.display = show ? "" : "none";
-        });
-    }
-
-    classSelect.addEventListener("change", filterTable);
-    sectionSelect.addEventListener("change", filterTable);
-
-    // تحديث الحضور عند التغيير
-    document.querySelectorAll(".attendance-checkbox").forEach(cb => {
-        cb.addEventListener("change", () => {
-            const studentId = cb.dataset.studentId;
-            const status = cb.dataset.status;
-
-            fetch("/update_attendance", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ student_id: studentId, status: status })
-            }).then(res => res.json())
-              .then(data => {
-                  if(!data.success) alert("حدث خطأ أثناء تحديث الحضور");
-              });
-        });
-    });
-});
-</script>
-
+<script src="{{ url_for('static', filename='js/attendance_table.js') }}"></script>
