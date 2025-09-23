@@ -1,20 +1,14 @@
 {% include 'partials/header.html' %}
 {% include 'partials/navbar.html' %}
 
-<style>
-#trackingTable thead th {
-    position: sticky;
-    top: 0;
-    background: #f8f9fa; /* لون خلفية زي bootstrap */
-    z-index: 10;
-}
-</style>
+<!-- استدعاء ملف CSS الخارجي الخاص بالـ Tracking -->
+<link rel="stylesheet" href="{{ url_for('static', filename='css/tracking.css') }}">
 
 <div class="container my-3">
 
-    <div class="d-flex justify-content-between mb-2">
-        <div><strong>اليوم والتاريخ: </strong> {{ today }}</div>
-        <div>
+    <div class="d-flex justify-content-between mb-2 tracking-header">
+        <div class="tracking-date">{{ today }}</div>
+        <div class="tracking-filters">
             <strong>الصف: </strong>
             <select id="classSelect" class="form-control d-inline-block w-auto">
                 <option value="">اختر صف</option>
@@ -32,62 +26,98 @@
         </div>
     </div>
 
-    <table class="table table-bordered" id="trackingTable">
-        <thead class="table-light">
-            <tr>
-                <th>الاسم</th>
-                <th>واجب</th>
-                <th>كتاب</th>
-                <th>مشاركة</th>
-                <th>مشاغبة</th>
-                <th>ملاحظة</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for student in students %}
-            {% set rec = records.get(student.id, {}) %}
-            <tr data-class="{{ student.class_name }}" data-section="{{ student.section }}">
-                <td>{{ student.student_name }}</td>
-                <td><input type="checkbox" class="track-checkbox" data-student="{{ student.id }}" data-field="homework" {% if rec.homework %}checked{% endif %}></td>
-                <td><input type="checkbox" class="track-checkbox" data-student="{{ student.id }}" data-field="book" {% if rec.book %}checked{% endif %}></td>
-                <td><input type="checkbox" class="track-checkbox" data-student="{{ student.id }}" data-field="participation" {% if rec.participation %}checked{% endif %}></td>
-                <td><input type="checkbox" class="track-checkbox" data-student="{{ student.id }}" data-field="misbehavior" {% if rec.misbehavior %}checked{% endif %}></td>
-                <td>
-                    <button class="btn btn-sm btn-warning note-btn" data-student="{{ student.id }}" {% if rec.note %}style="background:red"{% endif %}>
-                        {% if rec.note %}تم إدخال ملاحظة{% else %}إضافة ملاحظة{% endif %}
-                    </button>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <!-- جعل الجدول فقط قابل للتمرير -->
+    <div class="table-responsive">
+        <table class="table table-bordered" id="trackingTable">
+            <thead class="table-light sticky-top">
+                <tr>
+                    <th style="width:40px">#</th> <!-- عمود الرقم -->
+                    <th>الاسم</th>
+                    <th>واجب</th>
+                    <th>كتاب</th>
+                    <th>مشاركة</th>
+                    <th>مشاغبة</th>
+                    <th>ملاحظة</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for student in students %}
+                {% set rec = records.get(student.id, {}) %}
+                <tr data-class="{{ student.class_name }}" data-section="{{ student.section }}">
+                    <td class="row-number"></td>
+                    <td>{{ student.student_name }}</td>
+                    <td><input type="checkbox" class="track-checkbox" data-student="{{ student.id }}" data-field="homework" {% if rec.homework %}checked{% endif %}></td>
+                    <td><input type="checkbox" class="track-checkbox" data-student="{{ student.id }}" data-field="book" {% if rec.book %}checked{% endif %}></td>
+                    <td><input type="checkbox" class="track-checkbox" data-student="{{ student.id }}" data-field="participation" {% if rec.participation %}checked{% endif %}></td>
+                    <td><input type="checkbox" class="track-checkbox" data-student="{{ student.id }}" data-field="misbehavior" {% if rec.misbehavior %}checked{% endif %}></td>
+                    <td>
+                        <button class="btn btn-sm btn-warning note-btn" data-student="{{ student.id }}" {% if rec.note %}style="background:red"{% endif %}>
+                            {% if rec.note %}تم إدخال ملاحظة{% else %}إضافة ملاحظة{% endif %}
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 </div>
 
 <!-- نافذة الملاحظة المنبثقة -->
-<div id="noteModal" class="modal" style="display:none; position:fixed; top:20%; left:50%; transform:translateX(-50%); background:white; padding:20px; border:1px solid #ccc; z-index:1000;">
+<div id="noteModal" class="modal">
     <h5>إدخال ملاحظة</h5>
     <textarea id="noteText" rows="5" cols="50"></textarea><br><br>
     <button id="saveNote" class="btn btn-primary">حفظ</button>
     <button id="closeNote" class="btn btn-secondary">إغلاق</button>
 </div>
 
+<!-- استدعاء ملف الجافاسكربت الخاص بالجدول -->
+<script src="{{ url_for('static', filename='js/dashboard_table.js') }}"></script>
+
 <script>
 document.addEventListener("DOMContentLoaded", () => {
-    // تحديث الشيك بوكس
-    document.querySelectorAll(".track-checkbox").forEach(chk => {
-        chk.addEventListener("change", () => {
-            const studentId = chk.dataset.student;
-            const field = chk.dataset.field;
-            const value = chk.checked ? 1 : 0;
+    const table = document.getElementById("trackingTable");
+    const classSelect = document.getElementById("classSelect");
+    const sectionSelect = document.getElementById("sectionSelect");
+    const checkboxes = document.querySelectorAll(".track-checkbox");
+
+    // ======== وظيفة الفلترة وترقيم الصفوف =========
+    function filterTable() {
+        const selectedClass = classSelect.value;
+        const selectedSection = sectionSelect.value;
+        let visibleIndex = 1;
+
+        table.querySelectorAll("tbody tr").forEach(row => {
+            let show = true;
+            if (selectedClass && row.dataset.class !== selectedClass) show = false;
+            if (selectedSection && row.dataset.section !== selectedSection) show = false;
+            row.style.display = show ? "" : "none";
+
+            // ترقيم الصفوف المرئية فقط
+            if (show) {
+                row.querySelector(".row-number").textContent = visibleIndex++;
+            }
+        });
+    }
+
+    classSelect.addEventListener("change", filterTable);
+    sectionSelect.addEventListener("change", filterTable);
+
+    // ======== تحديث الشيك بوكس =========
+    checkboxes.forEach(cb => {
+        cb.addEventListener("change", () => {
+            const studentId = cb.dataset.student;
+            const field = cb.dataset.field;
+            const value = cb.checked ? 1 : 0;
+
             fetch("/update_tracking", {
                 method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({student_id: studentId, field: field, value: value})
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ student_id: studentId, field: field, value: value })
             });
         });
     });
 
-    // نافذة الملاحظة
+    // ======== نافذة الملاحظة =========
     let currentStudentId = null;
     const modal = document.getElementById("noteModal");
     const noteText = document.getElementById("noteText");
@@ -104,7 +134,7 @@ document.addEventListener("DOMContentLoaded", () => {
         fetch("/update_note", {
             method: "POST",
             headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({student_id: currentStudentId, note: noteText.value})
+            body: JSON.stringify({ student_id: currentStudentId, note: noteText.value })
         }).then(() => {
             modal.style.display = "none";
             const btn = document.querySelector(`.note-btn[data-student='${currentStudentId}']`);
@@ -117,27 +147,8 @@ document.addEventListener("DOMContentLoaded", () => {
         modal.style.display = "none";
     });
 
-    // فلترة الجدول عند اختيار الصف أو الشعبة
-    const classSelect = document.getElementById("classSelect");
-    const sectionSelect = document.getElementById("sectionSelect");
-    const tableRows = document.querySelectorAll("#trackingTable tbody tr");
-
-    function filterTable() {
-        const selectedClass = classSelect.value;
-        const selectedSection = sectionSelect.value;
-
-        tableRows.forEach(row => {
-            const rowClass = row.dataset.class;
-            const rowSection = row.dataset.section;
-            let show = true;
-            if(selectedClass && rowClass !== selectedClass) show = false;
-            if(selectedSection && rowSection !== selectedSection) show = false;
-            row.style.display = show ? "" : "none";
-        });
-    }
-
-    classSelect.addEventListener("change", filterTable);
-    sectionSelect.addEventListener("change", filterTable);
+    // ======== الترقيم عند التحميل الأول =========
+    filterTable();
 });
 </script>
 
