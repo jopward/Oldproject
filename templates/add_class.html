@@ -34,7 +34,7 @@
         <option value="">-- اختر الشعبة --</option>
         {% set sections = ['أ', 'ب', 'ج', 'د', 'و', 'هـ', 'ي'] %}
         {% for s in sections %}
-          <option value="{{ s }}">{{ s }}</option>
+          <option value="{{ s }}" {% if request.form.section == s %}selected{% endif %}>{{ s }}</option>
         {% endfor %}
       </select>
     </div>
@@ -43,8 +43,8 @@
     <div class="mb-3">
       <label class="form-label fw-bold">⏰ الفترة</label>
       <select name="period" class="form-select">
-        <option value="صباحي" selected>صباحي</option>
-        <option value="مسائي">مسائي</option>
+        <option value="صباحي" {% if request.form.period == 'صباحي' %}selected{% endif %}>صباحي</option>
+        <option value="مسائي" {% if request.form.period == 'مسائي' %}selected{% endif %}>مسائي</option>
       </select>
       <div class="form-text">إذا لم تختَر، يتم حفظ الصف تلقائيًا كـ <b>صباحي</b>.</div>
     </div>
@@ -54,7 +54,9 @@
       <label class="form-label fw-bold">👨‍🏫 اختر المعلمين</label>
       <select name="teacher_ids" class="form-select" multiple required>
         {% for teacher in teachers %}
-        <option value="{{ teacher.id }}">{{ teacher.teacher_name }}</option>
+        <option value="{{ teacher.id }}" {% if teacher.id|string in request.form.getlist('teacher_ids') %}selected{% endif %}>
+          {{ teacher.teacher_name }}
+        </option>
         {% endfor %}
       </select>
       <div class="form-text">يمكنك اختيار أكثر من معلم بالضغط على Ctrl أو Cmd مع النقر.</div>

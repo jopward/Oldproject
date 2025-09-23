@@ -25,7 +25,7 @@
     <div class="mb-3">
       <label class="form-label fw-bold">🏫 اسم الصف</label>
       <input type="text" name="class_name" class="form-control"
-             value="{{ class_data.class_name }}" required>
+             value="{{ request.form.class_name or class_data.class_name }}" required>
     </div>
 
     <!-- الشعبة -->
@@ -34,7 +34,10 @@
       <select name="section" class="form-select" required>
         {% set sections = ['أ', 'ب', 'ج', 'د', 'و', 'هـ', 'ي'] %}
         {% for s in sections %}
-          <option value="{{ s }}" {% if s == class_data.section %}selected{% endif %}>{{ s }}</option>
+          <option value="{{ s }}"
+            {% if request.form.section == s or (not request.form.section and s == class_data.section) %}selected{% endif %}>
+            {{ s }}
+          </option>
         {% endfor %}
       </select>
     </div>
@@ -43,8 +46,14 @@
     <div class="mb-3">
       <label class="form-label fw-bold">⏰ الفترة</label>
       <select name="period" class="form-select">
-        <option value="صباحي" {% if class_data.period == 'صباحي' %}selected{% endif %}>صباحي</option>
-        <option value="مسائي" {% if class_data.period == 'مسائي' %}selected{% endif %}>مسائي</option>
+        <option value="صباحي"
+          {% if request.form.period == 'صباحي' or (not request.form.period and class_data.period == 'صباحي') %}selected{% endif %}>
+          صباحي
+        </option>
+        <option value="مسائي"
+          {% if request.form.period == 'مسائي' or (not request.form.period and class_data.period == 'مسائي') %}selected{% endif %}>
+          مسائي
+        </option>
       </select>
     </div>
 
@@ -53,9 +62,11 @@
       <label class="form-label fw-bold">👨‍🏫 المعلمين</label>
       <select name="teacher_ids" class="form-select" multiple required>
         {% for teacher in teachers %}
-        <option value="{{ teacher.id }}" {% if teacher.id in current_teacher_ids %}selected{% endif %}>
-          {{ teacher.teacher_name }}
-        </option>
+          {% set selected_teachers = request.form.getlist('teacher_ids') or current_teacher_ids %}
+          <option value="{{ teacher.id }}"
+            {% if teacher.id|string in selected_teachers|string %}selected{% endif %}>
+            {{ teacher.teacher_name }}
+          </option>
         {% endfor %}
       </select>
       <div class="form-text">يمكنك اختيار أكثر من معلم بالضغط على Ctrl أو Cmd مع النقر.</div>

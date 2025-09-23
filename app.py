@@ -32,6 +32,22 @@ def students():
         return redirect(url_for("dashboard"))
     return students_module.students()
 
+# ✅ استدعاء الطلاب مع البحث
+@app.route('/get_students', methods=['GET'])
+@login_required
+def get_students():
+    if session.get("role") != "admin":
+        return jsonify({"error": "❌ غير مسموح"}), 403
+    return students_module.get_students()
+
+# ✅ إضافة طالب
+@app.route('/add_student', methods=['POST'])
+@login_required
+def add_student():
+    if session.get("role") != "admin":
+        return jsonify({"error": "❌ غير مسموح"}), 403
+    return students_module.add_student()
+
 @app.route('/edit_student/<int:student_id>', methods=['POST'])
 @login_required
 def edit_student(student_id):
