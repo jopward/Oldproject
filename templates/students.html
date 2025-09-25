@@ -8,28 +8,26 @@
     <!-- نموذج إضافة طلاب جدد -->
     <div class="card mb-4 p-3">
         <h4>إضافة طلاب جدد</h4>
-        <form id="addStudentForm">
+        <form method="POST" id="addStudentForm">
+            <input type="hidden" name="action" value="add">
+
             <div class="mb-2">
                 <label>الأسماء (ضع كل اسم في سطر جديد):</label>
-                <textarea id="studentNames" rows="5" class="form-control" placeholder="مثال:&#10;محمد علي محمد&#10;أحمد محمود عثمان" required></textarea>
+                <textarea name="student_names" rows="5" class="form-control" placeholder="مثال:&#10;محمد علي محمد&#10;أحمد محمود عثمان" required></textarea>
             </div>
 
-            <!-- اختيار الصف -->
             <div class="mb-2">
                 <label>الصف:</label>
-                <select id="className" required class="form-control">
-                    <option value="">-- اختر الصف --</option>
-                    {% for c in classes|unique(attribute='class_name') %}
-                        <option value="{{ c.class_name }}">{{ c.class_name }}</option>
-                    {% endfor %}
-                </select>
+                <input type="text" name="class_name" required class="form-control">
             </div>
 
-            <!-- اختيار الشعبة -->
             <div class="mb-2">
                 <label>الشعبة:</label>
-                <select id="section" required class="form-control">
-                    <option value="">-- اختر الشعبة --</option>
+                <select name="section" required class="form-control">
+                    <option value="أ">أ</option>
+                    <option value="ب">ب</option>
+                    <option value="ج">ج</option>
+                    <option value="د">د</option>
                 </select>
             </div>
 
@@ -48,8 +46,19 @@
                     <th>إجراءات</th>
                 </tr>
             </thead>
-            <tbody id="studentsTableBody">
-                <!-- سيتم تعبئته ديناميكيًا -->
+            <tbody>
+                {% for student in students %}
+                <tr data-student-id="{{ student.id }}">
+                    <td class="name">{{ student.student_name }}</td>
+                    <td class="class">{{ student.class_name }}</td>
+                    <td class="section">{{ student.section }}</td>
+                    <td>
+                        <button class="btn btn-sm btn-warning editBtn">تعديل</button>
+                        <button class="btn btn-sm btn-success saveBtn" style="display:none;">حفظ</button>
+                        <button class="btn btn-sm btn-danger deleteBtn">حذف</button>
+                    </td>
+                </tr>
+                {% endfor %}
             </tbody>
         </table>
     </div>
@@ -58,155 +67,78 @@
 
 <script>
 document.addEventListener("DOMContentLoaded", () => {
-    const form = document.getElementById("addStudentForm");
-    const tableBody = document.getElementById("studentsTableBody");
-    const classSelect = document.getElementById("className");
-    const sectionSelect = document.getElementById("section");
-    const classes = {{ classes|tojson }}; // جلب الصفوف والشعب من السيرفر
 
-    // تحديث قائمة الشعب عند اختيار الصف
-    classSelect.addEventListener("change", () => {
-        const selectedClass = classSelect.value;
-        const sections = classes.filter(c => c.class_name === selectedClass).map(c => c.section);
-        sectionSelect.innerHTML = '<option value="">-- اختر الشعبة --</option>';
-        sections.forEach(s => {
-            const opt = document.createElement("option");
-            opt.value = s;
-            opt.textContent = s;
-            sectionSelect.appendChild(opt);
+    // حذف طالب
+    document.querySelectorAll(".deleteBtn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const row = btn.closest("tr");
+            const studentId = row.dataset.studentId;
+            if(confirm("هل تريد حذف هذا الطالب؟")) {
+                fetch(`/delete_student/${studentId}`, { method: "POST" })
+                    .then(res => res.json())
+                    .then(data => {
+                        if(data.success) row.remove();
+                    });
+            }
         });
     });
 
-    // تحميل الطلاب
-    function loadStudents() {
-        fetch("/get_students")
-            .then(res => res.json())
-            .then(data => {
-                tableBody.innerHTML = "";
-                data.forEach(student => {
-                    const row = document.createElement("tr");
-                    row.dataset.studentId = student.id;
-                    row.innerHTML = `
-                        <td class="name">${student.student_name}</td>
-                        <td class="class">${student.class_name || ""}</td>
-                        <td class="section">${student.section || ""}</td>
-                        <td>
-                            <button class="btn btn-sm btn-warning editBtn">تعديل</button>
-                            <button class="btn btn-sm btn-success saveBtn" style="display:none;">حفظ</button>
-                            <button class="btn btn-sm btn-danger deleteBtn">حذف</button>
-                        </td>
-                    `;
-                    tableBody.appendChild(row);
-                });
-                attachRowEvents();
-            });
-    }
+    // تعديل طالب inline
+    document.querySelectorAll(".editBtn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const row = btn.closest("tr");
+            const nameCell = row.querySelector(".name");
+            const classCell = row.querySelector(".class");
+            const sectionCell = row.querySelector(".section");
 
-    // ربط أحداث الصفوف (تعديل وحذف)
-    function attachRowEvents() {
-        document.querySelectorAll(".deleteBtn").forEach(btn => {
-            btn.onclick = () => {
-                const row = btn.closest("tr");
+            const name = nameCell.textContent;
+            const className = classCell.textContent;
+            const section = sectionCell.textContent;
+
+            nameCell.innerHTML = `<input type="text" class="form-control" value="${name}">`;
+            classCell.innerHTML = `<input type="text" class="form-control" value="${className}">`;
+            sectionCell.innerHTML = `
+                <select class="form-control">
+                    <option value="أ" ${section==="أ"?"selected":""}>أ</option>
+                    <option value="ب" ${section==="ب"?"selected":""}>ب</option>
+                    <option value="ج" ${section==="ج"?"selected":""}>ج</option>
+                    <option value="د" ${section==="د"?"selected":""}>د</option>
+                </select>
+            `;
+
+            btn.style.display = "none";
+            const saveBtn = row.querySelector(".saveBtn");
+            saveBtn.style.display = "inline-block";
+
+            saveBtn.addEventListener("click", () => {
+                const newName = nameCell.querySelector("input").value;
+                const newClass = classCell.querySelector("input").value;
+                const newSection = sectionCell.querySelector("select").value;
                 const studentId = row.dataset.studentId;
-                if(confirm("هل تريد حذف هذا الطالب؟")) {
-                    fetch(`/delete_student/${studentId}`, { method: "POST" })
-                        .then(res => res.json())
-                        .then(data => {
-                            if(data.success) row.remove();
-                        });
-                }
-            };
+
+                fetch(`/edit_student/${studentId}`, {
+                    method: "POST",
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        student_name: newName,
+                        class_name: newClass,
+                        section: newSection
+                    })
+                }).then(res => res.json())
+                  .then(data => {
+                    if(data.success) {
+                        nameCell.textContent = newName;
+                        classCell.textContent = newClass;
+                        sectionCell.textContent = newSection;
+
+                        btn.style.display = "inline-block";
+                        saveBtn.style.display = "none";
+                    }
+                  });
+            });
         });
+    });
 
-        document.querySelectorAll(".editBtn").forEach(btn => {
-            btn.onclick = () => {
-                const row = btn.closest("tr");
-                const nameCell = row.querySelector(".name");
-                const classCell = row.querySelector(".class");
-                const sectionCell = row.querySelector(".section");
-
-                const name = nameCell.textContent;
-                const className = classCell.textContent;
-                const section = sectionCell.textContent;
-
-                // تحويل الصف والشعبة لقوائم منبثقة
-                const classOptions = Array.from(document.getElementById("className").options)
-                                          .map(o => `<option value="${o.value}" ${o.value===className?"selected":""}>${o.value}</option>`).join("");
-                const sectionOptions = classes
-                                        .filter(c => c.class_name === className)
-                                        .map(c => `<option value="${c.section}" ${c.section===section?"selected":""}>${c.section}</option>`).join("");
-
-                nameCell.innerHTML = `<input type="text" class="form-control" value="${name}">`;
-                classCell.innerHTML = `<select class="form-control">${classOptions}</select>`;
-                sectionCell.innerHTML = `<select class="form-control">${sectionOptions}</select>`;
-
-                btn.style.display = "none";
-                const saveBtn = row.querySelector(".saveBtn");
-                saveBtn.style.display = "inline-block";
-
-                saveBtn.onclick = () => {
-                    const newName = nameCell.querySelector("input").value;
-                    const newClass = classCell.querySelector("select").value;
-                    const newSection = sectionCell.querySelector("select").value;
-                    const studentId = row.dataset.studentId;
-
-                    fetch(`/edit_student/${studentId}`, {
-                        method: "POST",
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            student_name: newName,
-                            class_name: newClass,
-                            section: newSection
-                        })
-                    }).then(res => res.json())
-                      .then(data => {
-                        if(data.success) {
-                            nameCell.textContent = newName;
-                            classCell.textContent = newClass;
-                            sectionCell.textContent = newSection;
-                            btn.style.display = "inline-block";
-                            saveBtn.style.display = "none";
-                        }
-                      });
-                };
-
-                // تحديث الشعبة عند تغيير الصف أثناء التعديل
-                const inlineClassSelect = classCell.querySelector("select");
-                const inlineSectionSelect = sectionCell.querySelector("select");
-                inlineClassSelect.onchange = () => {
-                    const newSelectedClass = inlineClassSelect.value;
-                    const newSections = classes.filter(c => c.class_name === newSelectedClass).map(c => c.section);
-                    inlineSectionSelect.innerHTML = "";
-                    newSections.forEach(s => {
-                        const opt = document.createElement("option");
-                        opt.value = s;
-                        opt.textContent = s;
-                        inlineSectionSelect.appendChild(opt);
-                    });
-                };
-            };
-        });
-    }
-
-    // إضافة الطلاب من النموذج
-    form.onsubmit = (e) => {
-        e.preventDefault();
-        const names = document.getElementById("studentNames").value.split("\n").map(n => n.trim()).filter(n => n);
-        const className = document.getElementById("className").value;
-        const section = document.getElementById("section").value;
-
-        names.forEach(name => {
-            fetch("/add_student", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ student_name: name, class_name: className, section: section })
-            }).then(() => loadStudents());
-        });
-
-        form.reset();
-    };
-
-    loadStudents();
 });
 </script>
 
