@@ -3,6 +3,7 @@ from flask import render_template, session, redirect, url_for, jsonify, request
 from auth import login_required
 from db import SessionLocal  # ✅ استدعاء جلسة SQLAlchemy
 from werkzeug.security import generate_password_hash
+from sqlalchemy import text  # ✅ إضافة text
 
 @login_required
 def teachers_page():
@@ -22,12 +23,12 @@ def teachers_page():
 
     if role == 'admin':
         teachers = db_session.execute(
-            "SELECT * FROM teachers WHERE school_id = :school_id ORDER BY teacher_name",
+            text("SELECT * FROM teachers WHERE school_id = :school_id ORDER BY teacher_name"),
             {"school_id": school_id}
         ).fetchall()
     else:
         teachers = db_session.execute(
-            "SELECT * FROM teachers WHERE id = :teacher_id AND school_id = :school_id",
+            text("SELECT * FROM teachers WHERE id = :teacher_id AND school_id = :school_id"),
             {"teacher_id": user['id'], "school_id": school_id}
         ).fetchall()
 
@@ -59,8 +60,8 @@ def add_teacher():
 
     db_session = SessionLocal()
     db_session.execute(
-        "INSERT INTO teachers (teacher_name, username, password, school_id) "
-        "VALUES (:teacher_name, :username, :password, :school_id)",
+        text("INSERT INTO teachers (teacher_name, username, password, school_id) "
+             "VALUES (:teacher_name, :username, :password, :school_id)"),
         {"teacher_name": teacher_name, "username": username, "password": hashed_pw, "school_id": school_id}
     )
     db_session.commit()
@@ -83,7 +84,7 @@ def delete_teacher(teacher_id):
 
     db_session = SessionLocal()
     teacher = db_session.execute(
-        "SELECT * FROM teachers WHERE id = :teacher_id AND school_id = :school_id",
+        text("SELECT * FROM teachers WHERE id = :teacher_id AND school_id = :school_id"),
         {"teacher_id": teacher_id, "school_id": school_id}
     ).fetchone()
 
@@ -92,7 +93,7 @@ def delete_teacher(teacher_id):
         return jsonify({"success": False, "message": "المعلم غير موجود أو ليس ضمن مدرستك"})
 
     db_session.execute(
-        "DELETE FROM teachers WHERE id = :teacher_id",
+        text("DELETE FROM teachers WHERE id = :teacher_id"),
         {"teacher_id": teacher_id}
     )
     db_session.commit()

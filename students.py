@@ -2,6 +2,7 @@
 from flask import render_template, request, redirect, url_for, jsonify, session, flash
 from db import SessionLocal  # ✅ استدعاء جلسة SQLAlchemy
 from auth import login_required
+from sqlalchemy import text  # ✅ إضافة text
 
 @login_required
 def students():
@@ -24,8 +25,8 @@ def students():
             name = name.strip()
             if name:
                 db_session.execute(
-                    'INSERT INTO students (student_name, class_name, section, school_id) '
-                    'VALUES (:student_name, :class_name, :section, :school_id)',
+                    text('INSERT INTO students (student_name, class_name, section, school_id) '
+                         'VALUES (:student_name, :class_name, :section, :school_id)'),
                     {"student_name": name, "class_name": class_name, "section": section, "school_id": school_id}
                 )
         db_session.commit()
@@ -34,7 +35,7 @@ def students():
 
     # GET → إظهار طلاب المدرسة الحالية فقط
     students_list = db_session.execute(
-        'SELECT * FROM students WHERE school_id = :school_id ORDER BY student_name',
+        text('SELECT * FROM students WHERE school_id = :school_id ORDER BY student_name'),
         {"school_id": school_id}
     ).fetchall()
     db_session.close()
@@ -49,17 +50,18 @@ def edit_student(student_id):
 
     db_session = SessionLocal()
     # تحديث بشرط school_id من السيشن
-    db_session.execute('''
-        UPDATE students
-        SET student_name=:student_name, class_name=:class_name, section=:section
-        WHERE id=:student_id AND school_id=:school_id
-    ''', {
-        "student_name": student_name,
-        "class_name": class_name,
-        "section": section,
-        "student_id": student_id,
-        "school_id": session.get("school_id")
-    })
+    db_session.execute(
+        text('UPDATE students '
+             'SET student_name=:student_name, class_name=:class_name, section=:section '
+             'WHERE id=:student_id AND school_id=:school_id'),
+        {
+            "student_name": student_name,
+            "class_name": class_name,
+            "section": section,
+            "student_id": student_id,
+            "school_id": session.get("school_id")
+        }
+    )
     db_session.commit()
     db_session.close()
     return jsonify({'success': True})
@@ -68,8 +70,10 @@ def edit_student(student_id):
 def delete_student(student_id):
     db_session = SessionLocal()
     # حذف بشرط school_id كمان
-    db_session.execute('DELETE FROM students WHERE id=:student_id AND school_id=:school_id',
-                       {"student_id": student_id, "school_id": session.get("school_id")})
+    db_session.execute(
+        text('DELETE FROM students WHERE id=:student_id AND school_id=:school_id'),
+        {"student_id": student_id, "school_id": session.get("school_id")}
+    )
     db_session.commit()
     db_session.close()
     return jsonify({'success': True})

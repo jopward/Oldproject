@@ -3,6 +3,7 @@ from flask import render_template, request, jsonify, session, redirect, url_for
 from datetime import date
 from db import SessionLocal  # SQLAlchemy session
 from auth import login_required
+from sqlalchemy import text  # ✅ إضافة text
 
 @login_required
 def tracking_page():
@@ -15,7 +16,7 @@ def tracking_page():
 
     # الطلاب من نفس المدرسة
     students = db_session.execute(
-        "SELECT * FROM students WHERE school_id=:school_id ORDER BY student_name",
+        text("SELECT * FROM students WHERE school_id=:school_id ORDER BY student_name"),
         {"school_id": school_id}
     ).fetchall()
 
@@ -23,12 +24,12 @@ def tracking_page():
     if session.get("role") == "teacher":
         teacher_id = session['user']['id']
         rows = db_session.execute(
-            "SELECT * FROM student_tracking WHERE date=:today AND school_id=:school_id AND teacher_id=:teacher_id",
+            text("SELECT * FROM student_tracking WHERE date=:today AND school_id=:school_id AND teacher_id=:teacher_id"),
             {"today": today, "school_id": school_id, "teacher_id": teacher_id}
         ).fetchall()
     else:
         rows = db_session.execute(
-            "SELECT * FROM student_tracking WHERE date=:today AND school_id=:school_id",
+            text("SELECT * FROM student_tracking WHERE date=:today AND school_id=:school_id"),
             {"today": today, "school_id": school_id}
         ).fetchall()
 
@@ -36,11 +37,11 @@ def tracking_page():
 
     # الصفوف والشعب لنفس المدرسة فقط
     classes = [row['class_name'] for row in db_session.execute(
-        "SELECT DISTINCT class_name FROM students WHERE school_id=:school_id",
+        text("SELECT DISTINCT class_name FROM students WHERE school_id=:school_id"),
         {"school_id": school_id}
     ).fetchall()]
     sections = [row['section'] for row in db_session.execute(
-        "SELECT DISTINCT section FROM students WHERE school_id=:school_id",
+        text("SELECT DISTINCT section FROM students WHERE school_id=:school_id"),
         {"school_id": school_id}
     ).fetchall()]
 
@@ -71,25 +72,28 @@ def update_tracking():
 
     db_session = SessionLocal()
 
-    existing = db_session.execute(
-        "SELECT id FROM student_tracking WHERE student_id=:student_id AND date=:today AND school_id=:school_id"
-        + (" AND teacher_id=:teacher_id" if teacher_id else ""),
-        {"student_id": student_id, "today": today, "school_id": school_id, **({"teacher_id": teacher_id} if teacher_id else {})}
-    ).fetchone()
+    existing_query = "SELECT id FROM student_tracking WHERE student_id=:student_id AND date=:today AND school_id=:school_id"
+    params = {"student_id": student_id, "today": today, "school_id": school_id}
+    if teacher_id:
+        existing_query += " AND teacher_id=:teacher_id"
+        params["teacher_id"] = teacher_id
+
+    existing = db_session.execute(text(existing_query), params).fetchone()
 
     if existing:
-        db_session.execute(
-            f"UPDATE student_tracking SET {field}=:value WHERE student_id=:student_id AND date=:today AND school_id=:school_id"
-            + (" AND teacher_id=:teacher_id" if teacher_id else ""),
-            {"value": value, "student_id": student_id, "today": today, "school_id": school_id, **({"teacher_id": teacher_id} if teacher_id else {})}
-        )
+        update_query = f"UPDATE student_tracking SET {field}=:value WHERE student_id=:student_id AND date=:today AND school_id=:school_id"
+        if teacher_id:
+            update_query += " AND teacher_id=:teacher_id"
+        db_session.execute(text(update_query), {**params, "value": value})
     else:
-        db_session.execute(
-            f"INSERT INTO student_tracking (student_id, date, {field}, school_id"
-            + (", teacher_id" if teacher_id else "") + ") VALUES (:student_id, :today, :value, :school_id"
-            + (", :teacher_id" if teacher_id else "") + ")",
-            {"student_id": student_id, "today": today, "value": value, "school_id": school_id, **({"teacher_id": teacher_id} if teacher_id else {})}
-        )
+        insert_query = f"INSERT INTO student_tracking (student_id, date, {field}, school_id"
+        if teacher_id:
+            insert_query += ", teacher_id"
+        insert_query += ") VALUES (:student_id, :today, :value, :school_id"
+        if teacher_id:
+            insert_query += ", :teacher_id"
+        insert_query += ")"
+        db_session.execute(text(insert_query), {**params, "value": value})
 
     db_session.commit()
     db_session.close()
@@ -110,25 +114,28 @@ def update_note():
 
     db_session = SessionLocal()
 
-    existing = db_session.execute(
-        "SELECT id FROM student_tracking WHERE student_id=:student_id AND date=:today AND school_id=:school_id"
-        + (" AND teacher_id=:teacher_id" if teacher_id else ""),
-        {"student_id": student_id, "today": today, "school_id": school_id, **({"teacher_id": teacher_id} if teacher_id else {})}
-    ).fetchone()
+    existing_query = "SELECT id FROM student_tracking WHERE student_id=:student_id AND date=:today AND school_id=:school_id"
+    params = {"student_id": student_id, "today": today, "school_id": school_id}
+    if teacher_id:
+        existing_query += " AND teacher_id=:teacher_id"
+        params["teacher_id"] = teacher_id
+
+    existing = db_session.execute(text(existing_query), params).fetchone()
 
     if existing:
-        db_session.execute(
-            "UPDATE student_tracking SET note=:note WHERE student_id=:student_id AND date=:today AND school_id=:school_id"
-            + (" AND teacher_id=:teacher_id" if teacher_id else ""),
-            {"note": note, "student_id": student_id, "today": today, "school_id": school_id, **({"teacher_id": teacher_id} if teacher_id else {})}
-        )
+        update_query = "UPDATE student_tracking SET note=:note WHERE student_id=:student_id AND date=:today AND school_id=:school_id"
+        if teacher_id:
+            update_query += " AND teacher_id=:teacher_id"
+        db_session.execute(text(update_query), {**params, "note": note})
     else:
-        db_session.execute(
-            "INSERT INTO student_tracking (student_id, date, note, school_id"
-            + (", teacher_id" if teacher_id else "") + ") VALUES (:student_id, :today, :note, :school_id"
-            + (", :teacher_id" if teacher_id else "") + ")",
-            {"student_id": student_id, "today": today, "note": note, "school_id": school_id, **({"teacher_id": teacher_id} if teacher_id else {})}
-        )
+        insert_query = "INSERT INTO student_tracking (student_id, date, note, school_id"
+        if teacher_id:
+            insert_query += ", teacher_id"
+        insert_query += ") VALUES (:student_id, :today, :note, :school_id"
+        if teacher_id:
+            insert_query += ", :teacher_id"
+        insert_query += ")"
+        db_session.execute(text(insert_query), {**params, "note": note})
 
     db_session.commit()
     db_session.close()
