@@ -8,6 +8,7 @@ import db  # ✅ استدعاء db.py
 import teachers  # ملف teachers.py
 import subjects  # ملف subjects.py
 from werkzeug.security import generate_password_hash  # ✅ إضافة التشفير
+from sqlalchemy.orm import joinedload
 
 # --- تعريف التطبيق ---
 app = Flask(__name__)
@@ -32,7 +33,6 @@ def students():
         return redirect(url_for("dashboard"))
     return students_module.students()
 
-# ✅ استدعاء الطلاب مع البحث
 @app.route('/get_students', methods=['GET'])
 @login_required
 def get_students():
@@ -40,7 +40,6 @@ def get_students():
         return jsonify({"error": "❌ غير مسموح"}), 403
     return students_module.get_students()
 
-# ✅ إضافة طالب
 @app.route('/add_student', methods=['POST'])
 @login_required
 def add_student():
@@ -95,114 +94,42 @@ def add_class():
         flash("غير مسموح، هذه الصفحة خاصة بالمدير فقط")
         return redirect(url_for("dashboard"))
 
-    conn = db.get_db_connection()
-    teachers_list = conn.execute(
-        "SELECT * FROM teachers WHERE school_id = ?", (session["school_id"],)
-    ).fetchall()
+    session_db = db.get_db_connection()
+    try:
+        teachers_list = session_db.query(db.Teacher).filter_by(school_id=session["school_id"]).all()
 
-    if request.method == "POST":
-        class_name = request.form.get("class_name")
-        section = request.form.get("section")
-        period = request.form.get("period") or "صباحي"
-        teacher_ids = request.form.getlist("teacher_ids")
+        if request.method == "POST":
+            class_name = request.form.get("class_name")
+            section = request.form.get("section")
+            period = request.form.get("period") or "صباحي"
+            teacher_ids = request.form.getlist("teacher_ids")
 
-        if class_name and section and teacher_ids:
-            cur = conn.execute(
-                "INSERT INTO teacher_classes (class_name, section, period, school_id) VALUES (?, ?, ?, ?)",
-                (class_name, section, period, session["school_id"])
-            )
-            class_id = cur.lastrowid
-            for t_id in teacher_ids:
-                conn.execute(
-                    "INSERT INTO class_teachers (class_id, teacher_id) VALUES (?, ?)",
-                    (class_id, t_id)
-                )
-            conn.commit()
-            flash("✅ تم إضافة الصف والشعبة بنجاح")
-            conn.close()
-            return redirect(url_for("list_classes"))
-        else:
-            flash("⚠️ يرجى تعبئة جميع الحقول واختيار المعلمين")
+            if class_name and section and teacher_ids:
+                new_class = db.TeacherClass(class_name=class_name, section=section, period=period)
+                session_db.add(new_class)
+                session_db.commit()  # لازم commit حتى يحصل على id
+                for t_id in teacher_ids:
+                    ct = db.ClassTeacher(class_id=new_class.id, teacher_id=int(t_id))
+                    session_db.add(ct)
+                session_db.commit()
+                flash("✅ تم إضافة الصف والشعبة بنجاح")
+                return redirect(url_for("list_classes"))
+            else:
+                flash("⚠️ يرجى تعبئة جميع الحقول واختيار المعلمين")
+    finally:
+        session_db.close()
 
-    conn.close()
     return render_template("add_class.html", teachers=teachers_list)
 
 @app.route("/classes")
 @login_required
 def list_classes():
-    conn = db.get_db_connection()
-    rows = conn.execute("""
-        SELECT tc.id, tc.class_name, tc.section, tc.period,
-               GROUP_CONCAT(t.teacher_name, ', ') AS teacher_names
-        FROM teacher_classes tc
-        LEFT JOIN class_teachers ct ON tc.id = ct.class_id
-        LEFT JOIN teachers t ON ct.teacher_id = t.id
-        WHERE tc.school_id = ?
-        GROUP BY tc.id
-    """, (session["school_id"],)).fetchall()
-    conn.close()
-    return render_template("list_classes.html", classes=rows)
-
-@app.route("/classes/edit/<int:class_id>", methods=["GET", "POST"])
-@login_required
-def edit_class(class_id):
-    if session.get("role") != "admin":
-        flash("غير مسموح، هذه الصفحة خاصة بالمدير فقط")
-        return redirect(url_for("dashboard"))
-
-    conn = db.get_db_connection()
-    teachers_list = conn.execute(
-        "SELECT * FROM teachers WHERE school_id = ?", (session["school_id"],)
-    ).fetchall()
-
-    class_row = conn.execute(
-        "SELECT * FROM teacher_classes WHERE id = ? AND school_id = ?", (class_id, session["school_id"])
-    ).fetchone()
-
-    current_teachers = conn.execute(
-        "SELECT teacher_id FROM class_teachers WHERE class_id = ?", (class_id,)
-    ).fetchall()
-    current_teacher_ids = [t['teacher_id'] for t in current_teachers]
-
-    if not class_row:
-        conn.close()
-        flash("⚠️ الصف/الشعبة غير موجود")
-        return redirect(url_for("list_classes"))
-
-    if request.method == "POST":
-        class_name = request.form.get("class_name")
-        section = request.form.get("section")
-        period = request.form.get("period") or "صباحي"
-        teacher_ids = request.form.getlist("teacher_ids")
-
-        if class_name and section and teacher_ids:
-            conn.execute("""
-                UPDATE teacher_classes
-                SET class_name = ?, section = ?, period = ?
-                WHERE id = ?
-            """, (class_name, section, period, class_id))
-
-            conn.execute("DELETE FROM class_teachers WHERE class_id = ?", (class_id,))
-            for t_id in teacher_ids:
-                conn.execute(
-                    "INSERT INTO class_teachers (class_id, teacher_id) VALUES (?, ?)",
-                    (class_id, t_id)
-                )
-
-            conn.commit()
-            conn.close()
-            flash("✅ تم تعديل الصف والشعبة بنجاح")
-            return redirect(url_for("list_classes"))
-        else:
-            flash("⚠️ يرجى تعبئة جميع الحقول واختيار المعلمين")
-
-    conn.close()
-    return render_template(
-        "edit_class.html",
-        class_data=class_row,
-        teachers=teachers_list,
-        current_teacher_ids=current_teacher_ids
-    )
+    session_db = db.get_db_connection()
+    try:
+        classes = session_db.query(db.TeacherClass).all()
+    finally:
+        session_db.close()
+    return render_template("list_classes.html", classes=classes)
 
 # --- إدارة المدارس (Superadmin) ---
 @app.route("/schools")
@@ -212,9 +139,11 @@ def list_schools():
         flash("❌ غير مسموح")
         return redirect(url_for("dashboard"))
 
-    conn = db.get_db_connection()
-    schools = conn.execute("SELECT * FROM schools").fetchall()
-    conn.close()
+    session_db = db.get_db_connection()
+    try:
+        schools = session_db.query(db.School).all()
+    finally:
+        session_db.close()
     return render_template("list_schools.html", schools=schools)
 
 @app.route("/schools/add", methods=["GET", "POST"])
@@ -230,14 +159,7 @@ def add_school():
         admin_password = request.form.get("admin_password")
 
         if school_name and admin_username and admin_password:
-            hashed_pw = generate_password_hash(admin_password)
-            conn = db.get_db_connection()
-            conn.execute("""
-                INSERT INTO schools (school_name, admin_username, admin_password)
-                VALUES (?, ?, ?)
-            """, (school_name, admin_username, hashed_pw))
-            conn.commit()
-            conn.close()
+            db.add_school(school_name, admin_username, admin_password)
             flash("✅ تم إضافة المدرسة بنجاح")
             return redirect(url_for("list_schools"))
         else:
@@ -245,67 +167,9 @@ def add_school():
 
     return render_template("add_school.html")
 
-@app.route("/schools/edit/<int:school_id>", methods=["GET", "POST"])
-@login_required
-def edit_school(school_id):
-    if session.get("role") != "superadmin":
-        flash("❌ غير مسموح")
-        return redirect(url_for("dashboard"))
-
-    conn = db.get_db_connection()
-    school = conn.execute("SELECT * FROM schools WHERE id = ?", (school_id,)).fetchone()
-
-    if not school:
-        flash("⚠️ المدرسة غير موجودة")
-        return redirect(url_for("list_schools"))
-
-    if request.method == "POST":
-        school_name = request.form.get("school_name")
-        admin_username = request.form.get("admin_username")
-        admin_password = request.form.get("admin_password")
-
-        if school_name and admin_username:
-            if admin_password:
-                hashed_pw = generate_password_hash(admin_password)
-                conn.execute("""
-                    UPDATE schools
-                    SET school_name = ?, admin_username = ?, admin_password = ?
-                    WHERE id = ?
-                """, (school_name, admin_username, hashed_pw, school_id))
-            else:
-                conn.execute("""
-                    UPDATE schools
-                    SET school_name = ?, admin_username = ?
-                    WHERE id = ?
-                """, (school_name, admin_username, school_id))
-
-            conn.commit()
-            conn.close()
-            flash("✅ تم تعديل بيانات المدرسة")
-            return redirect(url_for("list_schools"))
-        else:
-            flash("⚠️ يرجى تعبئة جميع الحقول")
-
-    conn.close()
-    return render_template("edit_school.html", school=school)
-
-@app.route("/schools/delete/<int:school_id>", methods=["POST"])
-@login_required
-def delete_school(school_id):
-    if session.get("role") != "superadmin":
-        flash("❌ غير مسموح")
-        return redirect(url_for("dashboard"))
-
-    conn = db.get_db_connection()
-    conn.execute("DELETE FROM schools WHERE id = ?", (school_id,))
-    conn.commit()
-    conn.close()
-    flash("🗑️ تم حذف المدرسة بنجاح")
-    return redirect(url_for("list_schools"))
-
 # --- إنشاء الجداول الافتراضية ---
-db.create_tables()
-db.seed_data()
+db.init_db()
+db.create_superadmin()
 
 if __name__ == '__main__':
     app.run(debug=True)

@@ -1,195 +1,171 @@
-# db.py
-import sqlite3
 from werkzeug.security import generate_password_hash
+from sqlalchemy import create_engine, Column, Integer, Text, ForeignKey, UniqueConstraint
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, relationship
 
-DB_NAME = "attendance.db"  # قاعدة البيانات الحالية
+# ========================
+# إعداد الاتصال بـ Neon PostgreSQL مع SSL ثابت
+# ========================
+DATABASE_URL = "postgresql://neondb_owner:npg_lAVrOD02hwmK@ep-orange-dream-a71g8nd6-pooler.ap-southeast-2.aws.neon.tech/neondb"
+
+# نمرر connect_args لتجنب مشاكل SSL
+engine = create_engine(
+    DATABASE_URL,
+    echo=True,
+    connect_args={"sslmode": "require"}
+)
+
+Base = declarative_base()
+SessionLocal = sessionmaker(bind=engine)
+
+# ========================
+# تعريف الجداول (كما هي تمامًا)
+# ========================
+
+class School(Base):
+    __tablename__ = "schools"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    school_name = Column(Text, nullable=False)
+    admin_username = Column(Text, nullable=False)
+    admin_password = Column(Text, nullable=False)
+
+    teachers = relationship("Teacher", back_populates="school", cascade="all, delete-orphan")
+    students = relationship("Student", back_populates="school", cascade="all, delete-orphan")
+
+class Teacher(Base):
+    __tablename__ = "teachers"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    teacher_name = Column(Text, nullable=False)
+    username = Column(Text, nullable=False)
+    password = Column(Text, nullable=False)
+    school_id = Column(Integer, ForeignKey("schools.id", ondelete="CASCADE"), nullable=False)
+
+    school = relationship("School", back_populates="teachers")
+    subjects = relationship("TeacherSubject", back_populates="teacher", cascade="all, delete-orphan")
+    classes = relationship("ClassTeacher", back_populates="teacher", cascade="all, delete-orphan")
+
+class Student(Base):
+    __tablename__ = "students"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    student_name = Column(Text, nullable=False)
+    class_name = Column(Text)
+    section = Column(Text)
+    school_id = Column(Integer, ForeignKey("schools.id", ondelete="CASCADE"), nullable=False)
+
+    school = relationship("School", back_populates="students")
+    attendance = relationship("Attendance", back_populates="student", cascade="all, delete-orphan")
+    tracking = relationship("StudentTracking", back_populates="student", cascade="all, delete-orphan")
+
+class TeacherClass(Base):
+    __tablename__ = "teacher_classes"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    class_name = Column(Text, nullable=False)
+    section = Column(Text)
+    period = Column(Text, default="صباحي")
+
+class ClassTeacher(Base):
+    __tablename__ = "class_teachers"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    class_id = Column(Integer, ForeignKey("teacher_classes.id", ondelete="CASCADE"), nullable=False)
+    teacher_id = Column(Integer, ForeignKey("teachers.id", ondelete="CASCADE"), nullable=False)
+
+    teacher = relationship("Teacher", back_populates="classes")
+    __table_args__ = (UniqueConstraint('class_id', 'teacher_id', name='uq_class_teacher'),)
+
+class Subject(Base):
+    __tablename__ = "subjects"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    subject_name = Column(Text, nullable=False, unique=True)
+
+class TeacherSubject(Base):
+    __tablename__ = "teacher_subjects"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    teacher_id = Column(Integer, ForeignKey("teachers.id", ondelete="CASCADE"), nullable=False)
+    subject_id = Column(Integer, ForeignKey("subjects.id", ondelete="CASCADE"), nullable=False)
+
+    teacher = relationship("Teacher", back_populates="subjects")
+    __table_args__ = (UniqueConstraint('teacher_id', 'subject_id', name='uq_teacher_subject'),)
+
+class ClassSubject(Base):
+    __tablename__ = "class_subjects"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    class_id = Column(Integer, ForeignKey("teacher_classes.id", ondelete="CASCADE"), nullable=False)
+    subject_id = Column(Integer, ForeignKey("subjects.id", ondelete="CASCADE"), nullable=False)
+    teacher_id = Column(Integer, ForeignKey("teachers.id", ondelete="CASCADE"), nullable=False)
+
+    __table_args__ = (UniqueConstraint('class_id', 'subject_id', 'teacher_id', name='uq_class_subject'),)
+
+class Attendance(Base):
+    __tablename__ = "attendance"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    student_id = Column(Integer, ForeignKey("students.id", ondelete="CASCADE"), nullable=False)
+    date = Column(Text, nullable=False)
+    status = Column(Text, nullable=False)
+    school_id = Column(Integer, ForeignKey("schools.id", ondelete="CASCADE"), nullable=False)
+    teacher_id = Column(Integer, ForeignKey("teachers.id", ondelete="SET NULL"))
+
+    student = relationship("Student", back_populates="attendance")
+
+class StudentTracking(Base):
+    __tablename__ = "student_tracking"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    student_id = Column(Integer, ForeignKey("students.id", ondelete="CASCADE"), nullable=False)
+    class_id = Column(Integer, ForeignKey("teacher_classes.id", ondelete="CASCADE"), nullable=False)
+    school_id = Column(Integer, ForeignKey("schools.id", ondelete="CASCADE"), nullable=False)
+    tracking_date = Column(Text, nullable=False)
+    note = Column(Text)
+
+    student = relationship("Student", back_populates="tracking")
+
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    username = Column(Text, nullable=False, unique=True)
+    password = Column(Text, nullable=False)
+    role = Column(Text, nullable=False)  # superadmin, admin, teacher
+
+# ========================
+# دوال مساعدة مع ضمان إغلاق الجلسات
+# ========================
 
 def get_db_connection():
-    conn = sqlite3.connect(DB_NAME)
-    conn.row_factory = sqlite3.Row
-    return conn
+    """ارجاع جلسة SQLAlchemy"""
+    return SessionLocal()
 
-# --- ✅ إنشاء الجداول الأساسية ---
-def create_tables():
-    conn = get_db_connection()
-    cur = conn.cursor()
+def init_db():
+    """إنشاء جميع الجداول"""
+    Base.metadata.create_all(engine)
 
-    # جدول المدارس
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS schools (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        school_name TEXT NOT NULL,
-        admin_username TEXT NOT NULL,
-        admin_password TEXT NOT NULL
-    )
-    """)
-
-    # جدول المعلمين
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS teachers (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        teacher_name TEXT NOT NULL,
-        username TEXT NOT NULL,
-        password TEXT NOT NULL,
-        school_id INTEGER NOT NULL,
-        FOREIGN KEY(school_id) REFERENCES schools(id)
-    )
-    """)
-
-    # جدول الصفوف
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS teacher_classes (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        class_name TEXT NOT NULL,
-        section TEXT,
-        period TEXT DEFAULT 'صباحي'
-    )
-    """)
-
-    # جدول وسيط لربط الصفوف بالمعلمين
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS class_teachers (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        class_id INTEGER NOT NULL,
-        teacher_id INTEGER NOT NULL,
-        FOREIGN KEY(class_id) REFERENCES teacher_classes(id) ON DELETE CASCADE,
-        FOREIGN KEY(teacher_id) REFERENCES teachers(id) ON DELETE CASCADE,
-        UNIQUE(class_id, teacher_id)
-    )
-    """)
-
-    # --- ✅ الجداول الجديدة للمواد ---
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS subjects (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        subject_name TEXT NOT NULL UNIQUE
-    )
-    """)
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS teacher_subjects (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        teacher_id INTEGER NOT NULL,
-        subject_id INTEGER NOT NULL,
-        FOREIGN KEY (teacher_id) REFERENCES teachers(id) ON DELETE CASCADE,
-        FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE,
-        UNIQUE (teacher_id, subject_id)
-    )
-    """)
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS class_subjects (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        class_id INTEGER NOT NULL,
-        subject_id INTEGER NOT NULL,
-        teacher_id INTEGER NOT NULL,
-        FOREIGN KEY (class_id) REFERENCES teacher_classes(id) ON DELETE CASCADE,
-        FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE,
-        FOREIGN KEY (teacher_id) REFERENCES teachers(id) ON DELETE CASCADE,
-        UNIQUE(class_id, subject_id, teacher_id)
-    )
-    """)
-
-    # --- ✅ جدول تتبع الطلاب ---
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS student_tracking (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        student_id INTEGER NOT NULL,
-        class_id INTEGER NOT NULL,
-        school_id INTEGER NOT NULL,
-        tracking_date TEXT NOT NULL,
-        note TEXT,
-        FOREIGN KEY(student_id) REFERENCES students(id) ON DELETE CASCADE,
-        FOREIGN KEY(class_id) REFERENCES teacher_classes(id) ON DELETE CASCADE,
-        FOREIGN KEY(school_id) REFERENCES schools(id) ON DELETE CASCADE
-    )
-    """)
-
-    # إضافة عمود school_id إلى جدول الطلاب إذا لم يكن موجود
-    cur.execute("PRAGMA table_info(students)")
-    columns = [col['name'] for col in cur.fetchall()]
-    if 'school_id' not in columns:
-        cur.execute("ALTER TABLE students ADD COLUMN school_id INTEGER REFERENCES schools(id)")
-
-    # --- ✅ إنشاء جدول السوبر أدمن (users) ---
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT NOT NULL UNIQUE,
-        password TEXT NOT NULL,
-        role TEXT NOT NULL
-    )
-    """)
-
-    conn.commit()
-    conn.close()
-
-# --- ✅ إضافة سوبر أدمن ---
 def create_superadmin(username="superadmin", password="12345"):
-    conn = get_db_connection()
-    cur = conn.cursor()
-    hashed_pw = generate_password_hash(password)
+    session = get_db_connection()
+    try:
+        hashed_pw = generate_password_hash(password)
+        exists = session.query(User).filter_by(username=username, role="superadmin").first()
+        if exists:
+            exists.password = hashed_pw
+            print(f"✅ تم تحديث كلمة مرور السوبر أدمن '{username}'")
+        else:
+            user = User(username=username, password=hashed_pw, role="superadmin")
+            session.add(user)
+            print(f"✅ تم إنشاء السوبر أدمن '{username}' بكلمة مرور جديدة")
+        session.commit()
+    finally:
+        session.close()
 
-    exists = cur.execute("SELECT * FROM users WHERE username = ? AND role = 'superadmin'", (username,)).fetchone()
-    if exists:
-        cur.execute("UPDATE users SET password = ? WHERE id = ?", (hashed_pw, exists['id']))
-        print(f"✅ تم تحديث كلمة مرور السوبر أدمن '{username}'")
-    else:
-        cur.execute("INSERT INTO users (username, password, role) VALUES (?, ?, 'superadmin')", (username, hashed_pw))
-        print(f"✅ تم إنشاء السوبر أدمن '{username}' بكلمة مرور جديدة")
+def add_school(school_name, admin_username, admin_password):
+    session = get_db_connection()
+    try:
+        hashed_pw = generate_password_hash(admin_password)
+        school = School(school_name=school_name, admin_username=admin_username, admin_password=hashed_pw)
+        session.add(school)
+        session.commit()
+        print(f"✅ تم إضافة المدرسة '{school_name}' بنجاح")
+    finally:
+        session.close()
 
-    conn.commit()
-    conn.close()
-
-# --- ✅ بقية الداتا الوهمية والمدارس والمعلمين كما هي ---
-def seed_data():
-    conn = get_db_connection()
-    cur = conn.cursor()
-    # مدارس وهمية
-    schools = [
-        {"school_name": "مدرسة النور", "admin_username": "admin_nour", "admin_password": generate_password_hash("1234")},
-        {"school_name": "مدرسة الأمل", "admin_username": "admin_amal", "admin_password": generate_password_hash("1234")}
-    ]
-    for s in schools:
-        cur.execute("INSERT OR IGNORE INTO schools (school_name, admin_username, admin_password) VALUES (?, ?, ?)",
-                    (s['school_name'], s['admin_username'], s['admin_password']))
-    cur.execute("SELECT * FROM schools")
-    school_rows = cur.fetchall()
-
-    teachers = [
-        {"teacher_name": "أحمد", "username": "ahmed", "password": generate_password_hash("123"), "school_id": school_rows[0]['id']},
-        {"teacher_name": "سعاد", "username": "suad", "password": generate_password_hash("123"), "school_id": school_rows[0]['id']},
-        {"teacher_name": "محمود", "username": "mahmoud", "password": generate_password_hash("123"), "school_id": school_rows[1]['id']},
-        {"teacher_name": "منى", "username": "mona", "password": generate_password_hash("123"), "school_id": school_rows[1]['id']}
-    ]
-    for t in teachers:
-        cur.execute("INSERT OR IGNORE INTO teachers (teacher_name, username, password, school_id) VALUES (?, ?, ?, ?)",
-                    (t['teacher_name'], t['username'], t['password'], t['school_id']))
-
-    conn.commit()
-    conn.close()
-    print("✅ تم إنشاء الجداول وإضافة بيانات وهمية بنجاح")
-
-# --- ✅ إضافة مدرسة جديدة ---
-def add_school(school_name, admin_username, admin_password, teachers_list=None):
-    conn = get_db_connection()
-    cur = conn.cursor()
-    hashed_admin_pw = generate_password_hash(admin_password)
-    cur.execute("INSERT INTO schools (school_name, admin_username, admin_password) VALUES (?, ?, ?)",
-                (school_name, admin_username, hashed_admin_pw))
-    school_id = cur.lastrowid
-
-    if teachers_list:
-        for t in teachers_list:
-            hashed_pw = generate_password_hash(t['password'])
-            cur.execute("INSERT INTO teachers (teacher_name, username, password, school_id) VALUES (?, ?, ?, ?)",
-                        (t['teacher_name'], t['username'], hashed_pw, school_id))
-    conn.commit()
-    conn.close()
-    print(f"✅ تم إضافة المدرسة '{school_name}' بنجاح")
-
-# --- التنفيذ عند تشغيل الملف مباشرة ---
+# ========================
+# تنفيذ عند التشغيل المباشر
+# ========================
 if __name__ == "__main__":
-    create_tables()
-    seed_data()
-    create_superadmin()  # إنشاء أو تحديث السوبر أدمن
+    init_db()
+    create_superadmin()

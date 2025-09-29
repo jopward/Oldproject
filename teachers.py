@@ -1,7 +1,7 @@
 # teachers.py
 from flask import render_template, session, redirect, url_for, jsonify, request
 from auth import login_required
-from db import get_db_connection
+from db import SessionLocal  # ✅ استدعاء جلسة SQLAlchemy
 from werkzeug.security import generate_password_hash
 
 @login_required
@@ -12,28 +12,26 @@ def teachers_page():
     المعلم العادي يرى نفسه فقط.
     """
     user = session.get('user')
-    school_id = session.get('school_id')  # معرف المدرسة من السيشن
-    role = session.get('role', 'teacher')  # 'admin' أو 'teacher'
+    school_id = session.get('school_id')
+    role = session.get('role', 'teacher')
 
     if not school_id:
         return redirect(url_for('dashboard'))
 
-    conn = get_db_connection()
+    db_session = SessionLocal()
 
     if role == 'admin':
-        # الأدمن يرى كل المعلمين في المدرسة
-        teachers = conn.execute(
-            "SELECT * FROM teachers WHERE school_id = ? ORDER BY teacher_name",
-            (school_id,)
+        teachers = db_session.execute(
+            "SELECT * FROM teachers WHERE school_id = :school_id ORDER BY teacher_name",
+            {"school_id": school_id}
         ).fetchall()
     else:
-        # المعلم العادي يرى نفسه فقط
-        teachers = conn.execute(
-            "SELECT * FROM teachers WHERE id = ? AND school_id = ?",
-            (user['id'], school_id)
+        teachers = db_session.execute(
+            "SELECT * FROM teachers WHERE id = :teacher_id AND school_id = :school_id",
+            {"teacher_id": user['id'], "school_id": school_id}
         ).fetchall()
 
-    conn.close()
+    db_session.close()
     return render_template("teachers.html", teachers=teachers)
 
 
@@ -59,13 +57,14 @@ def add_teacher():
 
     hashed_pw = generate_password_hash(password)
 
-    conn = get_db_connection()
-    conn.execute(
-        "INSERT INTO teachers (teacher_name, username, password, school_id) VALUES (?, ?, ?, ?)",
-        (teacher_name, username, hashed_pw, school_id)
+    db_session = SessionLocal()
+    db_session.execute(
+        "INSERT INTO teachers (teacher_name, username, password, school_id) "
+        "VALUES (:teacher_name, :username, :password, :school_id)",
+        {"teacher_name": teacher_name, "username": username, "password": hashed_pw, "school_id": school_id}
     )
-    conn.commit()
-    conn.close()
+    db_session.commit()
+    db_session.close()
     return jsonify({"success": True, "message": "تم إضافة المعلم بنجاح"})
 
 
@@ -82,18 +81,20 @@ def delete_teacher(teacher_id):
     if role != 'admin' or not school_id:
         return jsonify({"success": False, "message": "غير مسموح"})
 
-    conn = get_db_connection()
-    # التحقق من أن المعلم ينتمي لنفس المدرسة
-    teacher = conn.execute(
-        "SELECT * FROM teachers WHERE id = ? AND school_id = ?",
-        (teacher_id, school_id)
+    db_session = SessionLocal()
+    teacher = db_session.execute(
+        "SELECT * FROM teachers WHERE id = :teacher_id AND school_id = :school_id",
+        {"teacher_id": teacher_id, "school_id": school_id}
     ).fetchone()
 
     if not teacher:
-        conn.close()
+        db_session.close()
         return jsonify({"success": False, "message": "المعلم غير موجود أو ليس ضمن مدرستك"})
 
-    conn.execute("DELETE FROM teachers WHERE id = ?", (teacher_id,))
-    conn.commit()
-    conn.close()
+    db_session.execute(
+        "DELETE FROM teachers WHERE id = :teacher_id",
+        {"teacher_id": teacher_id}
+    )
+    db_session.commit()
+    db_session.close()
     return jsonify({"success": True, "message": "تم الحذف بنجاح"})

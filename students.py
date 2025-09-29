@@ -1,16 +1,16 @@
 # students.py
 from flask import render_template, request, redirect, url_for, jsonify, session, flash
-from db import get_db_connection
+from db import SessionLocal  # ✅ استدعاء جلسة SQLAlchemy
 from auth import login_required
 
 @login_required
 def students():
-    conn = get_db_connection()
+    db_session = SessionLocal()
     school_id = session.get("school_id")
 
     if not school_id:
         flash("⚠️ لم يتم تحديد المدرسة")
-        conn.close()
+        db_session.close()
         return redirect(url_for("dashboard"))
 
     if request.method == 'POST':
@@ -23,20 +23,21 @@ def students():
         for name in student_names.splitlines():
             name = name.strip()
             if name:
-                conn.execute(
-                    'INSERT INTO students (student_name, class_name, section, school_id) VALUES (?, ?, ?, ?)',
-                    (name, class_name, section, school_id)
+                db_session.execute(
+                    'INSERT INTO students (student_name, class_name, section, school_id) '
+                    'VALUES (:student_name, :class_name, :section, :school_id)',
+                    {"student_name": name, "class_name": class_name, "section": section, "school_id": school_id}
                 )
-        conn.commit()
-        conn.close()
+        db_session.commit()
+        db_session.close()
         return redirect(url_for('students'))
 
     # GET → إظهار طلاب المدرسة الحالية فقط
-    students_list = conn.execute(
-        'SELECT * FROM students WHERE school_id = ? ORDER BY student_name',
-        (school_id,)
+    students_list = db_session.execute(
+        'SELECT * FROM students WHERE school_id = :school_id ORDER BY student_name',
+        {"school_id": school_id}
     ).fetchall()
-    conn.close()
+    db_session.close()
     return render_template('students.html', students=students_list)
 
 @login_required
@@ -46,23 +47,29 @@ def edit_student(student_id):
     class_name = data.get('class_name')
     section = data.get('section')
 
-    conn = get_db_connection()
-    # تحديث بشرط school_id من السيشن (عشان ما يقدر مدير يعدل طلاب مدرسة تانية)
-    conn.execute('''
+    db_session = SessionLocal()
+    # تحديث بشرط school_id من السيشن
+    db_session.execute('''
         UPDATE students
-        SET student_name=?, class_name=?, section=?
-        WHERE id=? AND school_id=?
-    ''', (student_name, class_name, section, student_id, session.get("school_id")))
-    conn.commit()
-    conn.close()
+        SET student_name=:student_name, class_name=:class_name, section=:section
+        WHERE id=:student_id AND school_id=:school_id
+    ''', {
+        "student_name": student_name,
+        "class_name": class_name,
+        "section": section,
+        "student_id": student_id,
+        "school_id": session.get("school_id")
+    })
+    db_session.commit()
+    db_session.close()
     return jsonify({'success': True})
 
 @login_required
 def delete_student(student_id):
-    conn = get_db_connection()
+    db_session = SessionLocal()
     # حذف بشرط school_id كمان
-    conn.execute('DELETE FROM students WHERE id=? AND school_id=?',
-                 (student_id, session.get("school_id")))
-    conn.commit()
-    conn.close()
+    db_session.execute('DELETE FROM students WHERE id=:student_id AND school_id=:school_id',
+                       {"student_id": student_id, "school_id": session.get("school_id")})
+    db_session.commit()
+    db_session.close()
     return jsonify({'success': True})
