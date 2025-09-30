@@ -1,30 +1,21 @@
 # auth.py
 from functools import wraps
-from flask import (
-    Blueprint, session, redirect, url_for,
-    flash, render_template, request
-)
+from flask import session, redirect, url_for, flash, render_template, request
 from werkzeug.security import check_password_hash
 from sqlalchemy.exc import OperationalError
 
-# استدعاء الدوال والنماذج من db.py
+# استدعي دوال و Models من db.py
 from db import get_db_connection, User, Teacher, School
-
-# إنشاء Blueprint
-auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
-
 
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user' not in session:
-            return redirect(url_for('auth.login'))
+            return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
 
-
-@auth_bp.route('/login', methods=['GET', 'POST'])
-def login():
+def login_view():
     """
     تسجيل الدخول:
     - superadmin   -> جدول users.role='superadmin'
@@ -36,14 +27,15 @@ def login():
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '').strip()
 
-        # افتح جلسة SQLAlchemy
-        try:
-            db_session = get_db_connection()
-        except OperationalError:
-            flash("خطأ في الاتصال بقاعدة البيانات. تأكد من إعدادات الاتصال.", "danger")
-            return redirect(url_for('auth.login'))
+        if not username or not password:
+            flash("⚠️ الرجاء تعبئة اسم المستخدم وكلمة المرور.", "warning")
+            return redirect(url_for('login'))
 
+        db_session = None
         try:
+            # افتح جلسة SQLAlchemy
+            db_session = get_db_connection()
+
             # 1) سوبرأدمن
             superadmin = db_session.query(User).filter_by(username=username, role='superadmin').first()
             if superadmin and check_password_hash(superadmin.password, password):
@@ -69,16 +61,27 @@ def login():
 
             # فشل التوثيق
             flash('اسم المستخدم أو كلمة المرور خاطئة', 'danger')
-            return redirect(url_for('auth.login'))
+            return redirect(url_for('login'))
+
+        except OperationalError:
+            flash("خطأ في الاتصال بقاعدة البيانات. تأكد من إعدادات الاتصال.", "danger")
+            return redirect(url_for('login'))
+
+        except Exception as e:
+            # أي خطأ آخر داخلي
+            flash(f"حدث خطأ داخلي: {str(e)}", "danger")
+            return redirect(url_for('login'))
 
         finally:
-            db_session.close()
+            if db_session:
+                try:
+                    db_session.close()
+                except:
+                    pass
 
     # GET
     return render_template('login.html')
 
-
-@auth_bp.route('/logout')
-def logout():
+def logout_view():
     session.clear()
-    return redirect(url_for('auth.login'))
+    return redirect(url_for('login'))
