@@ -5,16 +5,18 @@ from sqlalchemy.orm import sessionmaker, relationship
 import os
 
 # ========================
-# إعداد الاتصال بـ Neon PostgreSQL عبر Environment Variable
+# إعداد الاتصال بـ Neon PostgreSQL عبر Environment Variables
 # ========================
-DATABASE_URL = os.environ.get("DATABASE_URL")  # على Render، ضع متغير البيئة DATABASE_URL
-if not DATABASE_URL:
-    raise Exception("❌ DATABASE_URL غير معرف في Environment Variables")
+DATABASE_URL = (
+    f"postgresql://{os.environ['DB_USER']}:{os.environ['DB_PASSWORD']}"
+    f"@{os.environ['DB_HOST']}:{os.environ.get('DB_PORT', 5432)}/{os.environ['DB_NAME']}"
+    f"?sslmode={os.environ.get('DB_SSLMODE','require')}"
+)
 
 engine = create_engine(
     DATABASE_URL,
-    echo=True,  # ضع False إذا أردت إخفاء الـ SQL في الإنتاج
-    connect_args={"sslmode": "require"}  # SSL ثابت
+    echo=True,
+    connect_args={"sslmode": "require"}
 )
 
 Base = declarative_base()
@@ -158,12 +160,24 @@ def add_school(school_name, admin_username, admin_password):
     session = get_db_connection()
     try:
         hashed_pw = generate_password_hash(admin_password)
-        school = School(school_name=school_name, admin_username=admin_username, admin_password=hashed_pw)
-        session.add(school)
+        exists = session.query(School).filter_by(school_name=school_name).first()
+        if exists:
+            exists.admin_username = admin_username
+            exists.admin_password = hashed_pw
+            print(f"✅ تم تحديث بيانات المدرسة '{school_name}'")
+        else:
+            school = School(school_name=school_name, admin_username=admin_username, admin_password=hashed_pw)
+            session.add(school)
+            print(f"✅ تم إضافة المدرسة '{school_name}' بنجاح")
         session.commit()
-        print(f"✅ تم إضافة المدرسة '{school_name}' بنجاح")
     finally:
         session.close()
+
+def add_default_schools():
+    """إضافة ثلاث مدارس افتراضية عند التشغيل"""
+    add_school("مدرسة النور", "admin_nour", "12345")
+    add_school("مدرسة المستقبل", "admin_mustaqbal", "12345")
+    add_school("مدرسة الابتكار", "admin_ibtikar", "12345")
 
 # ========================
 # تنفيذ عند التشغيل المباشر
@@ -171,3 +185,4 @@ def add_school(school_name, admin_username, admin_password):
 if __name__ == "__main__":
     init_db()
     create_superadmin()
+    add_default_schools()
