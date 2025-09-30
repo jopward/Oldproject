@@ -1,9 +1,11 @@
 # auth.py
 from functools import wraps
 from flask import session, redirect, url_for, flash, render_template, request
-from db import get_db_connection
 from werkzeug.security import check_password_hash
-from sqlalchemy import text
+from sqlalchemy.exc import OperationalError
+
+# استدعي دوال وـModels من db.py
+from db import get_db_connection, User, Teacher, School
 
 def login_required(f):
     @wraps(f)
@@ -14,56 +16,59 @@ def login_required(f):
     return decorated_function
 
 def login_view():
+    """
+    تسجيل الدخول:
+    - superadmin   -> جدول users.role='superadmin'
+    - admin        -> جدول schools (admin_username)
+    - teacher      -> جدول teachers (username)
+    يستخدم ORM (SQLAlchemy) وليس SQL النصّي
+    """
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '').strip()
-        conn = get_db_connection()
 
-        # --- تحقق من السوبر أدمن ---
-        superadmin_row = conn.execute(
-            text("SELECT * FROM users WHERE username = :username AND role = 'superadmin'"),
-            {"username": username}
-        ).fetchone()
-        if superadmin_row:
-            superadmin = dict(superadmin_row._mapping)
-            if check_password_hash(superadmin['password'], password):
-                session['user'] = {'id': superadmin['id'], 'name': username}
+        # افتح جلسة SQLAlchemy
+        try:
+            db_session = get_db_connection()
+        except OperationalError as e:
+            # خطأ اتصال بقاعدة البيانات (Neon / Postgres) — أعرض رسالة للمستخدم ولوج مفيد للـ logs
+            flash("خطأ في الاتصال بقاعدة البيانات. تأكد من إعدادات الاتصال.", "danger")
+            # اظهر الخطأ في الخادم (لا تعرضه للمستخدم في الإنتاج)
+            raise
+
+        try:
+            # 1) سوبرأدمن عبر جدول users (ORM)
+            superadmin = db_session.query(User).filter_by(username=username, role='superadmin').first()
+            if superadmin and check_password_hash(superadmin.password, password):
+                session['user'] = {'id': superadmin.id, 'name': username}
                 session['role'] = 'superadmin'
-                conn.close()
                 return redirect(url_for('dashboard'))
 
-        # --- تحقق من المعلمين ---
-        teacher_row = conn.execute(
-            text("SELECT * FROM teachers WHERE username = :username"),
-            {"username": username}
-        ).fetchone()
-        if teacher_row:
-            teacher = dict(teacher_row._mapping)
-            if check_password_hash(teacher['password'], password):
-                session['user'] = {'id': teacher['id'], 'name': teacher['teacher_name']}
-                session['school_id'] = teacher['school_id']
+            # 2) معلم
+            teacher = db_session.query(Teacher).filter_by(username=username).first()
+            if teacher and check_password_hash(teacher.password, password):
+                session['user'] = {'id': teacher.id, 'name': teacher.teacher_name}
+                session['school_id'] = teacher.school_id
                 session['role'] = 'teacher'
-                conn.close()
                 return redirect(url_for('dashboard'))
 
-        # --- تحقق من مدراء المدارس ---
-        school_row = conn.execute(
-            text("SELECT * FROM schools WHERE admin_username = :username"),
-            {"username": username}
-        ).fetchone()
-        if school_row:
-            school = dict(school_row._mapping)
-            if check_password_hash(school['admin_password'], password):
-                session['user'] = {'id': school['id'], 'name': username}
-                session['school_id'] = school['id']
+            # 3) مدير مدرسة (admin) عبر جدول schools
+            school = db_session.query(School).filter_by(admin_username=username).first()
+            if school and check_password_hash(school.admin_password, password):
+                session['user'] = {'id': school.id, 'name': username}
+                session['school_id'] = school.id
                 session['role'] = 'admin'
-                conn.close()
                 return redirect(url_for('dashboard'))
 
-        conn.close()
-        flash('اسم المستخدم أو كلمة المرور خاطئة', 'danger')
-        return redirect(url_for('login'))
+            # فشل التوثيق
+            flash('اسم المستخدم أو كلمة المرور خاطئة', 'danger')
+            return redirect(url_for('login'))
 
+        finally:
+            # تأكد من غلق الجلسة دائماً
+            db_session.close()
+
+    # GET
     return render_template('login.html')
 
 def logout_view():
