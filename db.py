@@ -5,7 +5,7 @@ from sqlalchemy.orm import sessionmaker, relationship
 import os
 
 # ========================
-# إعداد الاتصال بـ Neon PostgreSQL عبر Environment Variables
+# إعداد الاتصال بـ Neggffghvffggon PostgreSQL عبر Environment Variables
 # ========================
 DATABASE_URL = (
     f"postgresql://{os.environ['DB_USER']}:{os.environ['DB_PASSWORD']}"
