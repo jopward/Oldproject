@@ -1,30 +1,31 @@
 from flask import Flask, request, jsonify, session, redirect, url_for, flash, render_template
-from auth import login_view, logout_view, login_required
+from werkzeug.security import generate_password_hash
+from sqlalchemy.orm import joinedload
+
+# --- استدعاء بقية الموديولات ---
 import attendance
 import students as students_module
 import tracking
 import reports as reports_module
-import db  # ✅ استدعاء db.py
-import teachers  # ملف teachers.py
-import subjects  # ملف subjects.py
-from werkzeug.security import generate_password_hash  # ✅ إضافة التشفير
-from sqlalchemy.orm import joinedload
+import db
+import teachers
+import subjects
+
+# --- استدعاء الـ Blueprint الجديد من auth.py ---
+from auth import auth_bp, login_required
 
 # --- تعريف التطبيق ---
 app = Flask(__name__)
 app.secret_key = 'your_secret_key_here'
 
-# --- تسجيل المسارات ---
+# --- تسجيل الـ Blueprint ---
+app.register_blueprint(auth_bp)  # جميع المسارات auth/login و auth/logout
 
-# auth
-app.add_url_rule('/login', 'login', login_view, methods=['GET', 'POST'])
-app.add_url_rule('/logout', 'logout', logout_view)
-
-# attendance / dashboard
+# --- attendance / dashboard ---
 app.add_url_rule('/', 'dashboard', attendance.dashboard)
 app.add_url_rule('/update_attendance', 'update_attendance', attendance.update_attendance, methods=['POST'])
 
-# students (خاص بالمدير فقط)
+# --- students (خاص بالمدير فقط) ---
 @app.route('/students', methods=['GET', 'POST'])
 @login_required
 def students():
@@ -63,23 +64,23 @@ def delete_student(student_id):
         return redirect(url_for("dashboard"))
     return students_module.delete_student(student_id)
 
-# tracking
+# --- tracking ---
 app.add_url_rule('/tracking', 'tracking_page', tracking.tracking_page)
 app.add_url_rule('/update_tracking', 'update_tracking', tracking.update_tracking, methods=['POST'])
 app.add_url_rule('/update_note', 'update_note', tracking.update_note, methods=['POST'])
 
-# reports
+# --- reports ---
 app.add_url_rule('/reports', 'reports_page', reports_module.reports_page)
 app.add_url_rule('/get_attendance_details/<int:student_id>/<status>', 'get_attendance_details', reports_module.get_attendance_details)
 app.add_url_rule('/get_tracking_details/<int:student_id>/<field>', 'get_tracking_details', reports_module.get_tracking_details)
 app.add_url_rule('/student/<int:student_id>', 'student_detail', reports_module.student_detail)
 
-# teachers
+# --- teachers ---
 app.add_url_rule('/teachers', 'teachers_page', teachers.teachers_page, methods=['GET'])
 app.add_url_rule('/teachers/delete/<int:teacher_id>', 'delete_teacher', teachers.delete_teacher, methods=['POST'])
 app.add_url_rule('/teachers/add', 'add_teacher', teachers.add_teacher, methods=['POST'])
 
-# subjects
+# --- subjects ---
 app.add_url_rule('/subjects', 'subjects_page', subjects.subjects_page, methods=['GET'])
 app.add_url_rule('/subjects/add', 'add_subject', subjects.add_subject, methods=['POST'])
 app.add_url_rule('/subjects/edit/<int:subject_id>', 'edit_subject', subjects.edit_subject, methods=['GET', 'POST'])
@@ -107,7 +108,7 @@ def add_class():
             if class_name and section and teacher_ids:
                 new_class = db.TeacherClass(class_name=class_name, section=section, period=period)
                 session_db.add(new_class)
-                session_db.commit()  # لازم commit حتى يحصل على id
+                session_db.commit()
                 for t_id in teacher_ids:
                     ct = db.ClassTeacher(class_id=new_class.id, teacher_id=int(t_id))
                     session_db.add(ct)
