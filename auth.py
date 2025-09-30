@@ -13,12 +13,12 @@ def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user' not in session:
-            return redirect(url_for('login'))  # يمكن استدعاؤه مباشرة
+            return redirect(url_for('login'))  # يعمل بدون تغيير
         return f(*args, **kwargs)
     return decorated_function
 
 # --- صفحة تسجيل الدخول ---
-@auth_bp.route('/login', methods=['GET', 'POST'], endpoint='login')  # <-- هنا أضفنا endpoint='login'
+@auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
@@ -55,7 +55,6 @@ def login():
                 session['role'] = 'admin'
                 return redirect(url_for('dashboard'))
 
-            # فشل التوثيق
             flash('اسم المستخدم أو كلمة المرور خاطئة', 'danger')
             return redirect(url_for('login'))
 
@@ -78,7 +77,7 @@ def login():
     return render_template('login.html')
 
 # --- صفحة تسجيل الخروج ---
-@auth_bp.route('/logout', endpoint='logout')
+@auth_bp.route('/logout')
 def logout():
     session.clear()
     return redirect(url_for('login'))
