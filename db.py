@@ -2,17 +2,19 @@ from werkzeug.security import generate_password_hash
 from sqlalchemy import create_engine, Column, Integer, Text, ForeignKey, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
+import os
 
 # ========================
-# إعداد الاتصال بـ Neon PostgreSQL مع SSL ثابت
+# إعداد الاتصال بـ Neon PostgreSQL عبر Environment Variable
 # ========================
-DATABASE_URL = "postgresql://neondb_owner:npg_lAVrOD02hwmK@ep-orange-dream-a71g8nd6-pooler.ap-southeast-2.aws.neon.tech/neondb"
+DATABASE_URL = os.environ.get("DATABASE_URL")  # على Render، ضع متغير البيئة DATABASE_URL
+if not DATABASE_URL:
+    raise Exception("❌ DATABASE_URL غير معرف في Environment Variables")
 
-# نمرر connect_args لتجنب مشاكل SSL
 engine = create_engine(
     DATABASE_URL,
-    echo=True,
-    connect_args={"sslmode": "require"}
+    echo=True,  # ضع False إذا أردت إخفاء الـ SQL في الإنتاج
+    connect_args={"sslmode": "require"}  # SSL ثابت
 )
 
 Base = declarative_base()
