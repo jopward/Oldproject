@@ -13,13 +13,12 @@ def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user' not in session:
-            # استخدم auth.login بسبب الـ Blueprint
-            return redirect(url_for('auth.login'))
+            return redirect(url_for('login'))  # يمكن استدعاؤه مباشرة
         return f(*args, **kwargs)
     return decorated_function
 
 # --- صفحة تسجيل الدخول ---
-@auth_bp.route('/login', methods=['GET', 'POST'])
+@auth_bp.route('/login', methods=['GET', 'POST'], endpoint='login')  # <-- هنا أضفنا endpoint='login'
 def login():
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
@@ -27,7 +26,7 @@ def login():
 
         if not username or not password:
             flash("⚠️ الرجاء تعبئة اسم المستخدم وكلمة المرور.", "warning")
-            return redirect(url_for('auth.login'))
+            return redirect(url_for('login'))
 
         db_session = None
         try:
@@ -38,7 +37,7 @@ def login():
             if superadmin and check_password_hash(superadmin.password, password):
                 session['user'] = {'id': superadmin.id, 'name': username}
                 session['role'] = 'superadmin'
-                return redirect(url_for('attendance.dashboard'))
+                return redirect(url_for('dashboard'))
 
             # 2) معلم
             teacher = db_session.query(Teacher).filter_by(username=username).first()
@@ -46,7 +45,7 @@ def login():
                 session['user'] = {'id': teacher.id, 'name': teacher.teacher_name}
                 session['school_id'] = teacher.school_id
                 session['role'] = 'teacher'
-                return redirect(url_for('attendance.dashboard'))
+                return redirect(url_for('dashboard'))
 
             # 3) مدير مدرسة (admin)
             school = db_session.query(School).filter_by(admin_username=username).first()
@@ -54,18 +53,19 @@ def login():
                 session['user'] = {'id': school.id, 'name': username}
                 session['school_id'] = school.id
                 session['role'] = 'admin'
-                return redirect(url_for('attendance.dashboard'))
+                return redirect(url_for('dashboard'))
 
+            # فشل التوثيق
             flash('اسم المستخدم أو كلمة المرور خاطئة', 'danger')
-            return redirect(url_for('auth.login'))
+            return redirect(url_for('login'))
 
         except OperationalError:
             flash("خطأ في الاتصال بقاعدة البيانات. تأكد من إعدادات الاتصال.", "danger")
-            return redirect(url_for('auth.login'))
+            return redirect(url_for('login'))
 
         except Exception as e:
             flash(f"حدث خطأ داخلي: {str(e)}", "danger")
-            return redirect(url_for('auth.login'))
+            return redirect(url_for('login'))
 
         finally:
             if db_session:
@@ -78,7 +78,7 @@ def login():
     return render_template('login.html')
 
 # --- صفحة تسجيل الخروج ---
-@auth_bp.route('/logout')
+@auth_bp.route('/logout', endpoint='logout')
 def logout():
     session.clear()
-    return redirect(url_for('auth.login'))
+    return redirect(url_for('login'))
