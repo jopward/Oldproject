@@ -92,7 +92,7 @@ app.add_url_rule('/subjects/remove_teacher/<int:st_id>', 'remove_teacher_from_su
 @login_required
 def add_class():
     if session.get("role") != "admin":
-        flash("غير مسموح، هذه الصفحة خاصة بالمدير فقط")
+        flash("❌ غير مسموح، هذه الصفحة خاصة بالمدير فقط")
         return redirect(url_for("dashboard"))
 
     session_db = db.get_db_connection()

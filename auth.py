@@ -1,39 +1,35 @@
 # auth.py
-from functools import wraps
-from flask import session, redirect, url_for, flash, render_template, request
+from flask import Blueprint, session, redirect, url_for, flash, render_template, request
 from werkzeug.security import check_password_hash
 from sqlalchemy.exc import OperationalError
-
-# استدعي دوال و Models من db.py
+from functools import wraps
 from db import get_db_connection, User, Teacher, School
 
+# --- إنشاء الـ Blueprint ---
+auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
+
+# --- Decorator للتحقق من تسجيل الدخول ---
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user' not in session:
-            return redirect(url_for('login'))
+            return redirect(url_for('auth.login'))
         return f(*args, **kwargs)
     return decorated_function
 
-def login_view():
-    """
-    تسجيل الدخول:
-    - superadmin   -> جدول users.role='superadmin'
-    - admin        -> جدول schools (admin_username)
-    - teacher      -> جدول teachers (username)
-    يستخدم ORM (SQLAlchemy) وليس SQL النصّي
-    """
+# --- صفحة تسجيل الدخول ---
+@auth_bp.route('/login', methods=['GET', 'POST'])
+def login():
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '').strip()
 
         if not username or not password:
             flash("⚠️ الرجاء تعبئة اسم المستخدم وكلمة المرور.", "warning")
-            return redirect(url_for('login'))
+            return redirect(url_for('auth.login'))
 
         db_session = None
         try:
-            # افتح جلسة SQLAlchemy
             db_session = get_db_connection()
 
             # 1) سوبرأدمن
@@ -61,16 +57,15 @@ def login_view():
 
             # فشل التوثيق
             flash('اسم المستخدم أو كلمة المرور خاطئة', 'danger')
-            return redirect(url_for('login'))
+            return redirect(url_for('auth.login'))
 
         except OperationalError:
             flash("خطأ في الاتصال بقاعدة البيانات. تأكد من إعدادات الاتصال.", "danger")
-            return redirect(url_for('login'))
+            return redirect(url_for('auth.login'))
 
         except Exception as e:
-            # أي خطأ آخر داخلي
             flash(f"حدث خطأ داخلي: {str(e)}", "danger")
-            return redirect(url_for('login'))
+            return redirect(url_for('auth.login'))
 
         finally:
             if db_session:
@@ -82,6 +77,8 @@ def login_view():
     # GET
     return render_template('login.html')
 
-def logout_view():
+# --- صفحة تسجيل الخروج ---
+@auth_bp.route('/logout')
+def logout():
     session.clear()
-    return redirect(url_for('login'))
+    return redirect(url_for('auth.login'))
